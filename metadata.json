@@ -1,0 +1,7 @@
+{
+  "name": "AR-Dine: Interactive Menu & Ordering",
+  "description": "A comprehensive platform for restaurant owners to create AR-enabled menus and for customers to visualize dishes in 3D on their tables before ordering.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
