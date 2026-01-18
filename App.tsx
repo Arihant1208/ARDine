@@ -64,7 +64,9 @@ const App: React.FC = () => {
   }, [menu, activeOwnerId, loadOwnerData]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.split('?')[1]);
+    const hash = window.location.hash;
+    const queryFragment = hash.includes('?') ? hash.split('?')[1] : window.location.search.slice(1);
+    const params = new URLSearchParams(queryFragment || '');
     const table = params.get('table');
     const uId = params.get('u');
     if (uId) {
