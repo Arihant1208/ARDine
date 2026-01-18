@@ -6,8 +6,9 @@ import { GoogleGenAI } from "@google/genai";
  * Using a factory pattern ensures we always have the latest API key from the environment.
  */
 export const getAIClient = () => {
-  if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not defined");
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("API_KEY/GEMINI_API_KEY environment variable is not defined");
   }
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return new GoogleGenAI({ apiKey });
 };
