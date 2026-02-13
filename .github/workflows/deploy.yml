@@ -26,15 +26,12 @@ jobs:
         with:
           filters: |
             frontend:
-              - 'App.tsx'
-              - 'index.tsx'
+              - 'src/**'
               - 'index.html'
               - 'vite.config.ts'
               - 'tsconfig.json'
-              - 'types.ts'
-              - 'views/**'
-              - 'components/**'
-              - 'services/**'
+              - 'package.json'
+              - 'package-lock.json'
             backend:
               - 'backend/**'
             database:

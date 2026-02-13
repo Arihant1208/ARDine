@@ -1,21 +1,21 @@
 # Repo Conventions + Web Security
 
 ## Project Layout
-- Frontend: `App.tsx`, `views/`, `components/`, `services/`
+- Frontend: `src/App.tsx`, `src/features/`, `src/shared/`, `src/stores/`
 - Backend/controllers: `backend/`
 - Data access: `database/`
-- Shared types: `types.ts`
+- Shared types: `src/shared/types.ts`
 
 ## Codebase Management
 - Prefer small PRs scoped to a single concern.
 - Keep boundaries intact:
-  - UI must call `services/api.ts`, not controller files directly.
+  - UI must call `src/shared/services/api.ts`, not controller files directly.
   - Controllers must call repositories, not the DB client.
 - Avoid introducing new libraries unless they materially improve reliability.
 
 ## TypeScript Standards
 - No `any` in new code.
-- Keep public types in `types.ts`.
+- Keep shared/public types in `src/shared/types.ts`.
 - Prefer exhaustive handling for status unions.
 
 ## Dependency Hygiene

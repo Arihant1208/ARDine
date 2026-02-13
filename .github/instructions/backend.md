@@ -1,7 +1,7 @@
 # Backend (Controllers + AI) Instructions
 
 ## Scope
-- Primary folders: `backend/`, `services/api.ts` (API boundary), `types.ts` (shared types)
+- Primary folders: `backend/`, `src/shared/services/api.ts` (API boundary), `src/shared/types.ts` (shared types)
 - Backend code is TypeScript modules used as controllers/services in this repo.
 
 ## Architecture

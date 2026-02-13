@@ -28,8 +28,8 @@ ARDine/
 │   ├── menuController.ts
 │   ├── orderController.ts
 │   └── server.ts
-├── database/               # Database client
-│   ├── dbClient.ts        # PostgreSQL client
+├── database/               # Data-access boundary
+│   ├── dbClient.ts        # Demo/in-memory DB (Map-backed)
 │   └── repositories.ts
 └── index.html
 ```
@@ -39,8 +39,8 @@ ARDine/
 ### Prerequisites
 
 - Node.js 18+ 
-- PostgreSQL database (Supabase recommended)
-- Gemini API key
+- Gemini API key (only required for menu photo → AI analysis)
+- (Optional) PostgreSQL connection string if you want to run `npm run db:setup`
 
 ### Installation
 
@@ -55,13 +55,15 @@ ARDine/
    ```
    
    Edit `.env.local` and add:
-   - Your Gemini API key
-   - Your Supabase database URL (replace `[YOUR-PASSWORD]`)
+   - `GEMINI_API_KEY` (or `API_KEY`) for backend AI calls
+   - `CORS_ORIGIN` if your frontend is not on `http://localhost:3000`
+   - `VITE_API_BASE_URL` only if you are not using the Vite dev proxy
 
-3. **Set up the database:**
+3. **(Optional) Set up a Postgres schema:**
    ```bash
    npm run db:setup
    ```
+   Note: the running app currently uses the demo/in-memory store in `database/dbClient.ts`. The `db:setup` script only applies SQL migrations; wiring runtime queries to Postgres is a separate step.
 
 4. **Start development servers:**
    
@@ -81,6 +83,13 @@ ARDine/
 
 ## 🏗️ Architecture
 
+### High-level flow
+
+- The React SPA (Vite) calls the backend via `src/shared/services/api.ts`.
+- The Express API in `backend/server.ts` routes requests to controllers.
+- Controllers validate inputs (`backend/validators.ts`), orchestrate AI where needed, and persist via repositories (`database/repositories.ts`).
+- Shared types live in `src/shared/types.ts` (imported via the `@/` alias).
+
 ### State Management (Zustand)
 
 - **useAuthStore**: Manages user authentication and session
@@ -89,21 +98,21 @@ ARDine/
 
 ### Database Schema
 
-- **users**: User accounts (owners)
-- **restaurant_configs**: Restaurant settings
-- **dishes**: Menu items with AR models
-- **orders**: Customer orders
-- **order_items**: Order line items
+- Runtime: demo/in-memory store in `database/dbClient.ts`.
+- Migrations: optional SQL schema in `backend/db/schema.sql` runnable via `npm run db:setup`.
 
 ## 📦 Deployment
 
-### Frontend (Vercel)
+### Frontend (GitHub Pages)
 
-1. Push your code to GitHub
-2. Connect repository to Vercel
-3. Set environment variables:
-   - `VITE_API_BASE_URL`: Your backend URL
-4. Deploy
+This repo includes a GitHub Actions workflow that builds the Vite app and deploys `dist/` to GitHub Pages on pushes to `main`.
+
+1. In GitHub, enable Pages for the repo:
+   - **Settings → Pages → Build and deployment → Source: GitHub Actions**
+2. Ensure your backend is deployed somewhere reachable via HTTPS.
+3. Set `VITE_API_BASE_URL` to your backend origin for production builds.
+   - Example: `https://your-backend.example.com`
+   - Note: GitHub Pages cannot host the Express backend.
 
 ### Backend (Render)
 
@@ -112,16 +121,14 @@ ARDine/
 3. Set build command: `npm install`
 4. Set start command: `npm run backend:start`
 5. Add environment variables:
-   - `DATABASE_URL`
-   - `GEMINI_API_KEY`
+   - `GEMINI_API_KEY` (or `API_KEY`)
    - `PORT=4000`
    - `CORS_ORIGIN`: Your frontend URL
 
-### Database (Supabase)
+### Database (Optional)
 
-1. Create a Supabase project
-2. Copy the connection string
-3. Run migrations: `npm run db:setup`
+- If you only need the demo behavior, no external DB is required.
+- If you want a Postgres schema ready for a real DB, set `DATABASE_URL` and run `npm run db:setup`.
 
 ## 🛠️ Development
 
@@ -156,7 +163,7 @@ ARDine/
 
 ## 📝 Notes
 
-- The current implementation uses a PostgreSQL database
+- The current runtime DB behavior is demo/in-memory (Map-backed)
 - AI-powered dish analysis uses Google Gemini
 - 3D model generation is simulated (integrate with real 3D API for production)
 - Authentication is basic (implement proper JWT/OAuth for production)

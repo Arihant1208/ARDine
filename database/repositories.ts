@@ -8,6 +8,9 @@ export const MenuRepository = {
   },
   async save(dish: Dish): Promise<Dish> {
     return await db.insertDish(dish);
+  },
+  async updateDishStatus(userId: UserId, dishId: string, updates: Partial<Dish>): Promise<void> {
+    return await db.updateDishStatus(userId, dishId, updates);
   }
 };
 

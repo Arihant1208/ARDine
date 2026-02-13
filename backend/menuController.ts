@@ -4,7 +4,6 @@ import { getAIClient } from "./aiClient";
 import { Dish, UserId } from "../src/shared/types";
 import { validateMenuImage } from "./validators";
 import { MenuRepository } from "../database/repositories";
-import { db } from "../database/dbClient";
 
 export const processMenuUpload = async (userId: UserId, base64Image: string): Promise<Dish> => {
   if (!validateMenuImage(base64Image)) {
@@ -87,7 +86,7 @@ const simulateThreeDPipeline = async (userId: UserId, dishId: string) => {
       updates.arModelUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
     }
 
-    await db.updateDishStatus(userId, dishId, updates);
+    await MenuRepository.updateDishStatus(userId, dishId, updates);
   }
 };
 

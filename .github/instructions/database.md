@@ -10,10 +10,14 @@
   - Controllers/services should depend on repository methods, not the DB client.
 
 ## Data Model
-- Keep shared types in `types.ts`.
+- Keep shared types in `src/shared/types.ts`.
 - Status enums:
   - `ModelGenerationStatus`: `pending | generating | ready | failed`.
   - `Order.status`: `received | preparing | served | paid`.
+
+## Migrations (Optional)
+- `npm run db:setup` runs `backend/db/setup.ts` which applies `backend/db/schema.sql` to the Postgres `DATABASE_URL`.
+- The running app does not currently read/write from Postgres at runtime; repositories call `database/dbClient.ts`.
 
 ## Conventions
 - Repository methods should:
