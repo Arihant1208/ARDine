@@ -1,5 +1,5 @@
 
-import { Dish, OrderItem } from "../types";
+import { Dish, OrderItem } from "../src/shared/types";
 
 export const validateMenuImage = (base64: string): boolean => {
   if (!base64) return false;
@@ -18,11 +18,11 @@ export const validateDishData = (dish: Partial<Dish>): boolean => {
 export const validateOrder = (tableNumber: number, items: OrderItem[]): boolean => {
   if (!tableNumber || tableNumber <= 0) return false;
   if (!items || items.length === 0) return false;
-  
-  return items.every(item => 
-    item.dish && 
-    item.dish.id && 
-    typeof item.quantity === 'number' && 
+
+  return items.every(item =>
+    item.dish &&
+    item.dish.id &&
+    typeof item.quantity === 'number' &&
     item.quantity > 0
   );
 };

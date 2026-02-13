@@ -1,7 +1,7 @@
 
 import { Type } from "@google/genai";
 import { getAIClient } from "./aiClient";
-import { Dish, UserId } from "../types";
+import { Dish, UserId } from "../src/shared/types";
 import { validateMenuImage } from "./validators";
 import { MenuRepository } from "../database/repositories";
 import { db } from "../database/dbClient";
@@ -42,7 +42,7 @@ export const processMenuUpload = async (userId: UserId, base64Image: string): Pr
   });
 
   const aiResult = JSON.parse(response.text || "{}");
-  
+
   const initialDish: Dish = {
     id: `dish_${Date.now()}`,
     userId,
@@ -75,7 +75,7 @@ const simulateThreeDPipeline = async (userId: UserId, dishId: string) => {
   for (const step of steps) {
     // Artificial delay to simulate heavy 3D processing (Photogrammetry, Mesh optimization, GLB packing)
     await new Promise(resolve => setTimeout(resolve, 4000 + Math.random() * 2000));
-    
+
     const updates: Partial<Dish> = {
       generationProgress: step.progress,
       modelGenerationStatus: step.status

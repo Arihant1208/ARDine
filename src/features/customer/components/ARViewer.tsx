@@ -1,6 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Dish } from '../types';
+import { Dish } from '@/shared/types';
 import { X, Box, ZoomIn, ZoomOut, RotateCcw, MousePointer2, Sparkles, AlertTriangle, RefreshCw, Smartphone, HelpCircle } from 'lucide-react';
 
 interface ARViewerProps {
@@ -66,7 +66,7 @@ const ARViewer: React.FC<ARViewerProps> = ({ dish, onClose }) => {
           <Box size={16} className="text-orange-500 shrink-0" />
           <h2 className="text-white font-black text-[10px] sm:text-xs truncate uppercase tracking-widest">{dish.name}</h2>
         </div>
-        <button 
+        <button
           onClick={onClose}
           className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-full flex items-center justify-center text-black shadow-xl active:scale-90 transition-transform"
         >
@@ -107,10 +107,10 @@ const ARViewer: React.FC<ARViewerProps> = ({ dish, onClose }) => {
         {/* Side Controls */}
         {isLoaded && arStatus !== 'presenting' && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-[105]">
-            <button onClick={() => adjustZoom(15)} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white border border-white/10"><ZoomIn size={18}/></button>
-            <button onClick={() => adjustZoom(-15)} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white border border-white/10"><ZoomOut size={18}/></button>
-            <button onClick={resetView} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white border border-white/10"><RotateCcw size={18}/></button>
-            <button onClick={() => setShowCompatibilityInfo(true)} className="w-10 h-10 bg-orange-500/20 backdrop-blur-xl rounded-xl flex items-center justify-center text-orange-400 border border-orange-500/20"><HelpCircle size={18}/></button>
+            <button onClick={() => adjustZoom(15)} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white border border-white/10"><ZoomIn size={18} /></button>
+            <button onClick={() => adjustZoom(-15)} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white border border-white/10"><ZoomOut size={18} /></button>
+            <button onClick={resetView} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white border border-white/10"><RotateCcw size={18} /></button>
+            <button onClick={() => setShowCompatibilityInfo(true)} className="w-10 h-10 bg-orange-500/20 backdrop-blur-xl rounded-xl flex items-center justify-center text-orange-400 border border-orange-500/20"><HelpCircle size={18} /></button>
           </div>
         )}
 
@@ -124,7 +124,7 @@ const ARViewer: React.FC<ARViewerProps> = ({ dish, onClose }) => {
                 </div>
                 <div className="flex-1">
                   <p className="text-white text-[10px] sm:text-xs font-bold leading-tight uppercase tracking-tight">
-                    {arStatus === 'failed' 
+                    {arStatus === 'failed'
                       ? "AR Not Supported - View 3D Mode"
                       : "Tap 'PLACE ON TABLE' to start AR"}
                   </p>
@@ -155,7 +155,7 @@ const ARViewer: React.FC<ARViewerProps> = ({ dish, onClose }) => {
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-tight">Move camera over a flat table surface.</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => setShowCompatibilityInfo(false)}
               className="w-full mt-8 py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px]"
             >

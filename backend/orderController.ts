@@ -1,12 +1,12 @@
 
-import { Order, OrderItem, PaymentMethod, UserId } from "../types";
+import { Order, OrderItem, PaymentMethod, UserId } from "../src/shared/types";
 import { validateOrder } from "./validators";
 import { OrderRepository } from "../database/repositories";
 
 export const createNewOrder = async (
   userId: UserId,
-  tableNumber: number, 
-  items: OrderItem[], 
+  tableNumber: number,
+  items: OrderItem[],
   paymentMethod: PaymentMethod
 ): Promise<Order> => {
   if (!validateOrder(tableNumber, items)) {

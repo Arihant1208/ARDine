@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
 import { ChefHat, Mail, Lock, User as UserIcon, LogIn, Sparkles, Chrome, PlayCircle } from 'lucide-react';
-import { ApiService } from '../services/api';
-import { User } from '../types';
-import Button from '../components/common/Button';
-import Card from '../components/common/Card';
+import { ApiService } from '@/shared/services/api';
+import { User } from '@/shared/types';
+import Button from '@/shared/components/ui/Button';
+import Card from '@/shared/components/ui/Card';
 
 interface AuthViewProps {
   onSuccess: (user: User) => void;
@@ -72,13 +72,13 @@ const AuthView: React.FC<AuthViewProps> = ({ onSuccess, onBack }) => {
                 <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block ml-2">Restaurant Name</label>
                 <div className="relative">
                   <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input 
-                    type="text" 
-                    required 
-                    value={name} 
+                  <input
+                    type="text"
+                    required
+                    value={name}
                     onChange={e => setName(e.target.value)}
-                    className="w-full p-4 pl-12 bg-gray-50 rounded-2xl font-bold border-none ring-1 ring-gray-100 focus:ring-2 focus:ring-orange-500 outline-none" 
-                    placeholder="Enter restaurant name" 
+                    className="w-full p-4 pl-12 bg-gray-50 rounded-2xl font-bold border-none ring-1 ring-gray-100 focus:ring-2 focus:ring-orange-500 outline-none"
+                    placeholder="Enter restaurant name"
                   />
                 </div>
               </div>
@@ -87,13 +87,13 @@ const AuthView: React.FC<AuthViewProps> = ({ onSuccess, onBack }) => {
               <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block ml-2">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input 
-                  type="email" 
-                  required 
-                  value={email} 
+                <input
+                  type="email"
+                  required
+                  value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="w-full p-4 pl-12 bg-gray-50 rounded-2xl font-bold border-none ring-1 ring-gray-100 focus:ring-2 focus:ring-orange-500 outline-none" 
-                  placeholder="name@example.com" 
+                  className="w-full p-4 pl-12 bg-gray-50 rounded-2xl font-bold border-none ring-1 ring-gray-100 focus:ring-2 focus:ring-orange-500 outline-none"
+                  placeholder="name@example.com"
                 />
               </div>
             </div>
@@ -101,20 +101,20 @@ const AuthView: React.FC<AuthViewProps> = ({ onSuccess, onBack }) => {
               <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block ml-2">Password</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input 
-                  type="password" 
-                  required 
-                  value={password} 
+                <input
+                  type="password"
+                  required
+                  value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="w-full p-4 pl-12 bg-gray-50 rounded-2xl font-bold border-none ring-1 ring-gray-100 focus:ring-2 focus:ring-orange-500 outline-none" 
-                  placeholder="••••••••" 
+                  className="w-full p-4 pl-12 bg-gray-50 rounded-2xl font-bold border-none ring-1 ring-gray-100 focus:ring-2 focus:ring-orange-500 outline-none"
+                  placeholder="••••••••"
                 />
               </div>
             </div>
 
             {error && <p className="text-red-500 text-[10px] font-black uppercase text-center">{error}</p>}
 
-            <Button type="submit" className="w-full" size="lg" isLoading={loading} icon={<LogIn size={18}/>}>
+            <Button type="submit" className="w-full" size="lg" isLoading={loading} icon={<LogIn size={18} />}>
               {isLogin ? "Sign In" : "Register Store"}
             </Button>
           </form>
@@ -126,39 +126,39 @@ const AuthView: React.FC<AuthViewProps> = ({ onSuccess, onBack }) => {
           </div>
 
           <div className="space-y-4">
-            <Button 
-              variant="outline" 
-              className="w-full" 
-              size="lg" 
-              onClick={handleGoogleLogin} 
-              icon={<Chrome size={18}/>}
+            <Button
+              variant="outline"
+              className="w-full"
+              size="lg"
+              onClick={handleGoogleLogin}
+              icon={<Chrome size={18} />}
               disabled={loading}
             >
               Sign in with Google
             </Button>
-            
-            <Button 
-              variant="ghost" 
-              className="w-full text-orange-600 hover:bg-orange-50" 
-              size="md" 
-              onClick={handleDemoLogin} 
-              icon={<PlayCircle size={18}/>}
+
+            <Button
+              variant="ghost"
+              className="w-full text-orange-600 hover:bg-orange-50"
+              size="md"
+              onClick={handleDemoLogin}
+              icon={<PlayCircle size={18} />}
               disabled={loading}
             >
               Try Demo Account
             </Button>
           </div>
 
-          <button 
-            onClick={() => setIsLogin(!isLogin)} 
+          <button
+            onClick={() => setIsLogin(!isLogin)}
             className="w-full mt-8 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors"
           >
             {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
           </button>
         </Card>
 
-        <button 
-          onClick={onBack} 
+        <button
+          onClick={onBack}
           className="w-full mt-6 text-xs font-black text-gray-300 uppercase tracking-widest hover:text-gray-500 flex items-center justify-center gap-2"
         >
           <Sparkles className="w-3 h-3" /> Back to Main

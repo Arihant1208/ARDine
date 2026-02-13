@@ -5,7 +5,7 @@ import { config as loadEnv } from 'dotenv';
 import { processMenuUpload, fetchMenu } from './menuController';
 import { createNewOrder, getLiveOrders, updateStatus } from './orderController';
 import { AuthRepository, ConfigRepository } from '../database/repositories';
-import type { Order, OrderItem, PaymentMethod, RestaurantConfig, UserId } from '../types';
+import type { Order, OrderItem, PaymentMethod, RestaurantConfig, UserId } from '../src/shared/types';
 
 loadEnv({ path: process.env.ENV_FILE ?? '.env.local' });
 

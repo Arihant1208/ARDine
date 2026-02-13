@@ -1,6 +1,6 @@
 
 import { db } from "./dbClient";
-import { Dish, Order, RestaurantConfig, UserId } from "../types";
+import { Dish, Order, RestaurantConfig, UserId } from "../src/shared/types";
 
 export const MenuRepository = {
   async getAll(userId: UserId): Promise<Dish[]> {

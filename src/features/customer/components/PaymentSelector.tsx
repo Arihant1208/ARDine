@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { PaymentMethod } from '../../types';
+import { PaymentMethod } from '@/shared/types';
 import { Smartphone, CreditCard, ReceiptText, Wallet as WalletIcon } from 'lucide-react';
 
 interface PaymentSelectorProps {
@@ -21,9 +21,9 @@ const PaymentSelector: React.FC<PaymentSelectorProps> = ({ selected, onSelect })
       {methods.map((m) => {
         const Icon = m.icon;
         return (
-          <button 
-            key={m.id} 
-            onClick={() => onSelect(m.id)} 
+          <button
+            key={m.id}
+            onClick={() => onSelect(m.id)}
             className={`p-6 rounded-3xl border-4 text-left transition-all flex items-center justify-between group ${selected === m.id ? 'border-orange-500 bg-orange-50' : 'border-transparent bg-gray-50 hover:bg-gray-100'}`}
           >
             <div>

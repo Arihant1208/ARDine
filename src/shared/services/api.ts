@@ -1,5 +1,5 @@
 
-import { Dish, OrderItem, PaymentMethod, Order, User, UserId, RestaurantConfig } from "../types";
+import { Dish, OrderItem, PaymentMethod, Order, User, UserId, RestaurantConfig } from "@/shared/types";
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL ?? '';
 
@@ -78,8 +78,8 @@ export const ApiService = {
   // Customer specific
   async placeOrder(
     userId: UserId,
-    tableNumber: number, 
-    items: OrderItem[], 
+    tableNumber: number,
+    items: OrderItem[],
     paymentMethod: PaymentMethod
   ): Promise<Order> {
     return await requestJson<Order>(`/api/users/${userId}/orders`, {

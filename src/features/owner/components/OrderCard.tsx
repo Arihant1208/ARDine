@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { Order, OrderStatus } from '../../types';
+import { Order, OrderStatus } from '@/shared/types';
 import { Clock, CheckCircle, Smartphone, CreditCard, ReceiptText, Wallet as WalletIcon } from 'lucide-react';
-import Badge from '../ui/Badge';
+import Badge from '@/shared/components/ui/Badge';
 
 interface OrderCardProps {
   order: Order;
@@ -30,11 +30,11 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
           <div className="text-right">
             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{order.id}</p>
             <p className="text-sm font-bold text-gray-400 flex items-center gap-2 justify-end">
-              <Clock className="w-3 h-3"/> {new Date(order.timestamp).toLocaleTimeString()}
+              <Clock className="w-3 h-3" /> {new Date(order.timestamp).toLocaleTimeString()}
             </p>
           </div>
         </div>
-        
+
         <div className="space-y-3 mb-8">
           {order.items.map((item, idx) => (
             <div key={idx} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
@@ -60,17 +60,17 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
             </Badge>
           </div>
           <div className="text-right">
-             <p className="text-[10px] text-gray-500 font-bold uppercase">Total Bill</p>
-             <p className="text-3xl font-black text-white">${order.total.toFixed(2)}</p>
+            <p className="text-[10px] text-gray-500 font-bold uppercase">Total Bill</p>
+            <p className="text-3xl font-black text-white">${order.total.toFixed(2)}</p>
           </div>
         </div>
-        
+
         {!isServed && (
-          <button 
+          <button
             onClick={() => onUpdateStatus(order.id, 'served')}
             className="w-full py-5 bg-orange-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2"
           >
-            <CheckCircle className="w-4 h-4"/> Mark as Served
+            <CheckCircle className="w-4 h-4" /> Mark as Served
           </button>
         )}
       </div>

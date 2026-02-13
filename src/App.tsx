@@ -1,24 +1,24 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
+import {
   ChefHat, LayoutDashboard, ShoppingBag, Settings, LogOut, Camera, RefreshCw, Box, CheckCircle2, User as UserIcon, Loader2
 } from 'lucide-react';
-import { Dish, Order, RestaurantConfig, ViewState, OrderItem, PaymentMethod, User, UserId } from './types';
-import { ApiService } from './services/api';
+import { Dish, Order, RestaurantConfig, ViewState, OrderItem, PaymentMethod, User, UserId } from '@/shared/types';
+import { ApiService } from '@/shared/services/api';
 
 // Components
-import ARViewer from './components/ARViewer';
-import Header from './components/layout/Header';
-import Button from './components/common/Button';
-import Card from './components/common/Card';
-import QRGenerator from './components/QRGenerator';
-import Badge from './components/ui/Badge';
+import ARViewer from '@/features/customer/components/ARViewer';
+import Header from '@/shared/layout/Header';
+import Button from '@/shared/components/ui/Button';
+import Card from '@/shared/components/ui/Card';
+import QRGenerator from '@/shared/components/QRGenerator';
+import Badge from '@/shared/components/ui/Badge';
 
 // Views
-import LandingView from './views/LandingView';
-import AuthView from './views/AuthView';
-import OrderCard from './components/owner/OrderCard';
-import PaymentSelector from './components/customer/PaymentSelector';
+import LandingView from '@/features/landing/LandingView';
+import AuthView from '@/features/auth/AuthView';
+import OrderCard from '@/features/owner/components/OrderCard';
+import PaymentSelector from '@/features/customer/components/PaymentSelector';
 
 const DEFAULT_DEMO_USER = 'u_demo';
 
@@ -50,7 +50,7 @@ const App: React.FC = () => {
       setMenu(fetchedMenu);
       if (fetchedConfig) setConfig(fetchedConfig);
       setActiveOwnerId(uId);
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   useEffect(() => {
@@ -155,13 +155,13 @@ const App: React.FC = () => {
   if (view === 'owner-setup' && currentUser) {
     return (
       <div className="min-h-screen bg-gray-50 pb-20">
-        <Header 
-          title="Owner Setup" 
+        <Header
+          title="Owner Setup"
           subtitle={currentUser.name}
           onBack={handleLogout}
           actions={
             <div className="flex gap-2">
-              <Button variant="dark" size="sm" icon={<LayoutDashboard size={14}/>} onClick={() => setView('owner-dashboard')}>Live Feed</Button>
+              <Button variant="dark" size="sm" icon={<LayoutDashboard size={14} />} onClick={() => setView('owner-dashboard')}>Live Feed</Button>
             </div>
           }
         />
@@ -169,21 +169,21 @@ const App: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-10">
             <Card className="p-6 sm:p-10">
               <h3 className="text-lg font-black mb-6 uppercase tracking-tight flex items-center gap-3">
-                <Settings className="text-orange-500" size={20}/> Store Info
+                <Settings className="text-orange-500" size={20} /> Store Info
               </h3>
               <div className="space-y-5">
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 mb-1.5 block px-1">Venue Name</label>
-                  <input type="text" value={config.name} onChange={e => setConfig({...config, name: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-500/20" />
+                  <input type="text" value={config.name} onChange={e => setConfig({ ...config, name: e.target.value })} className="w-full p-4 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-500/20" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 mb-1.5 block px-1">Total Tables</label>
-                  <input type="number" value={config.tables} onChange={e => setConfig({...config, tables: parseInt(e.target.value) || 0})} className="w-full p-4 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-500/20" />
+                  <input type="number" value={config.tables} onChange={e => setConfig({ ...config, tables: parseInt(e.target.value) || 0 })} className="w-full p-4 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-500/20" />
                 </div>
                 <Button variant="primary" className="w-full h-14" onClick={handleSaveConfig}>Update Store</Button>
               </div>
             </Card>
-            
+
             <Card className="p-6 sm:p-10 flex flex-col items-center justify-center min-h-[300px] bg-orange-50 border-orange-100 border-dashed border-2">
               {isProcessing ? (
                 <div className="text-center">
@@ -193,7 +193,7 @@ const App: React.FC = () => {
               ) : (
                 <label className="cursor-pointer text-center group w-full flex flex-col items-center">
                   <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-orange-500 mb-6 shadow-xl group-hover:scale-105 transition-transform">
-                    <Camera size={32}/>
+                    <Camera size={32} />
                   </div>
                   <p className="font-black text-lg tracking-tight">Upload Menu Photo</p>
                   <p className="text-[10px] text-gray-500 font-bold uppercase mt-2">AI will auto-generate 3D dish data</p>
@@ -202,7 +202,7 @@ const App: React.FC = () => {
               )}
             </Card>
           </div>
-          
+
           <div className="space-y-6">
             <h3 className="text-xl font-black tracking-tighter uppercase px-2">Active Menu</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8">
@@ -215,7 +215,7 @@ const App: React.FC = () => {
                         <Loader2 className="w-6 h-6 animate-spin text-orange-500 mb-4" />
                         <p className="text-[9px] font-black uppercase tracking-widest">3D Synthesis: {dish.generationProgress}%</p>
                         <div className="w-full bg-white/20 h-1 rounded-full mt-3 overflow-hidden max-w-[120px]">
-                           <div className="bg-orange-500 h-full transition-all" style={{ width: `${dish.generationProgress}%` }} />
+                          <div className="bg-orange-500 h-full transition-all" style={{ width: `${dish.generationProgress}%` }} />
                         </div>
                       </div>
                     )}
@@ -227,17 +227,17 @@ const App: React.FC = () => {
                   </div>
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-2 gap-2">
-                       <h4 className="font-black text-base truncate text-gray-900 uppercase tracking-tight">{dish.name}</h4>
-                       <span className="font-black text-orange-500 shrink-0">${dish.price.toFixed(2)}</span>
+                      <h4 className="font-black text-base truncate text-gray-900 uppercase tracking-tight">{dish.name}</h4>
+                      <span className="font-black text-orange-500 shrink-0">${dish.price.toFixed(2)}</span>
                     </div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase leading-relaxed line-clamp-2 mb-6">{dish.description}</p>
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
-                       <Badge variant="info">{dish.category}</Badge>
-                       {dish.modelGenerationStatus === 'ready' && (
-                         <button onClick={() => setArDish(dish)} className="p-2.5 bg-gray-100 rounded-xl text-orange-500 hover:bg-orange-500 hover:text-white transition-all shadow-sm">
-                           <Box size={18} />
-                         </button>
-                       )}
+                      <Badge variant="info">{dish.category}</Badge>
+                      {dish.modelGenerationStatus === 'ready' && (
+                        <button onClick={() => setArDish(dish)} className="p-2.5 bg-gray-100 rounded-xl text-orange-500 hover:bg-orange-500 hover:text-white transition-all shadow-sm">
+                          <Box size={18} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -258,8 +258,8 @@ const App: React.FC = () => {
   if (view === 'owner-dashboard' && currentUser) {
     return (
       <div className="min-h-screen bg-[#050505] text-white">
-        <Header 
-          title="Kitchen Feed" 
+        <Header
+          title="Kitchen Feed"
           subtitle="Real-time Flow"
           dark
           onBack={() => setView('owner-setup')}
@@ -282,13 +282,13 @@ const App: React.FC = () => {
   if (view === 'customer-menu') {
     return (
       <div className="min-h-screen bg-white pb-32">
-        <Header 
-          title={config.name} 
+        <Header
+          title={config.name}
           subtitle={`Table T${selectedTable}`}
           onBack={() => setView('landing')}
           actions={
-            <Button variant="dark" size="sm" icon={<ShoppingBag size={14}/>} onClick={() => setView('customer-cart')} className="relative">
-              {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-orange-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-2 border-white text-[9px] font-black">{cart.reduce((a,b)=>a+b.quantity,0)}</span>}
+            <Button variant="dark" size="sm" icon={<ShoppingBag size={14} />} onClick={() => setView('customer-cart')} className="relative">
+              {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-orange-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-2 border-white text-[9px] font-black">{cart.reduce((a, b) => a + b.quantity, 0)}</span>}
               Cart
             </Button>
           }
@@ -300,7 +300,7 @@ const App: React.FC = () => {
                 <img src={dish.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={dish.name} />
                 {dish.modelGenerationStatus === 'ready' ? (
                   <button onClick={() => setArDish(dish)} className="absolute bottom-6 right-6 w-14 h-14 bg-white rounded-3xl flex items-center justify-center text-orange-500 shadow-xl border border-white active:scale-90 transition-transform">
-                    <Box size={30}/>
+                    <Box size={30} />
                   </button>
                 ) : (
                   <div className="absolute bottom-6 right-6 p-3 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10 text-white/80 flex items-center gap-2">
@@ -315,7 +315,7 @@ const App: React.FC = () => {
                   <p className="text-lg font-black text-orange-500 shrink-0">${dish.price.toFixed(2)}</p>
                 </div>
                 <p className="text-gray-400 text-[10px] font-bold uppercase leading-relaxed line-clamp-2 mb-8 flex-1">{dish.description}</p>
-                <Button variant="dark" className="w-full h-12" onClick={() => setCart(p => { const ex = p.find(i => i.dish.id === dish.id); return ex ? p.map(i => i.dish.id === dish.id ? {...i, quantity: i.quantity + 1} : i) : [...p, {dish, quantity: 1}]; })}>
+                <Button variant="dark" className="w-full h-12" onClick={() => setCart(p => { const ex = p.find(i => i.dish.id === dish.id); return ex ? p.map(i => i.dish.id === dish.id ? { ...i, quantity: i.quantity + 1 } : i) : [...p, { dish, quantity: 1 }]; })}>
                   Add to Table
                 </Button>
               </div>
@@ -325,14 +325,14 @@ const App: React.FC = () => {
         {cart.length > 0 && (
           <div className="fixed bottom-6 inset-x-6 z-40">
             <div className="max-w-2xl mx-auto">
-              <Button 
-                variant="primary" 
-                size="xl" 
+              <Button
+                variant="primary"
+                size="xl"
                 className="w-full flex justify-between items-center shadow-2xl px-8"
                 onClick={() => setView('customer-cart')}
               >
                 <span className="text-sm font-black">View Order Details</span>
-                <span className="text-base font-black">${cart.reduce((a,b)=>a+(b.dish.price*b.quantity),0).toFixed(2)}</span>
+                <span className="text-base font-black">${cart.reduce((a, b) => a + (b.dish.price * b.quantity), 0).toFixed(2)}</span>
               </Button>
             </div>
           </div>
@@ -343,7 +343,7 @@ const App: React.FC = () => {
   }
 
   if (view === 'customer-cart') {
-    const subtotal = cart.reduce((a,b)=>a+(b.dish.price*b.quantity),0);
+    const subtotal = cart.reduce((a, b) => a + (b.dish.price * b.quantity), 0);
     const tax = subtotal * 0.05;
     return (
       <div className="min-h-screen bg-gray-50 pb-20">
@@ -365,10 +365,10 @@ const App: React.FC = () => {
                   ))}
                 </div>
                 <div className="pt-6 border-t space-y-3">
-                   <div className="flex justify-between items-center">
-                      <span className="font-black text-lg uppercase tracking-tighter">Total Amount</span>
-                      <span className="text-2xl font-black text-orange-500">${(subtotal + tax).toFixed(2)}</span>
-                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-black text-lg uppercase tracking-tighter">Total Amount</span>
+                    <span className="text-2xl font-black text-orange-500">${(subtotal + tax).toFixed(2)}</span>
+                  </div>
                 </div>
               </Card>
               <div className="space-y-4 pt-4">

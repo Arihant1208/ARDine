@@ -1,9 +1,9 @@
 
-import { Dish, Order, User, RestaurantConfig, UserId } from "../types";
+import { Dish, Order, User, RestaurantConfig, UserId } from "../src/shared/types";
 
 class PostgresClient {
   private static instance: PostgresClient;
-  
+
   private users: Map<string, User> = new Map();
   private credentials: Map<string, string> = new Map();
   private dishes: Map<UserId, Map<string, Dish>> = new Map();
@@ -30,7 +30,7 @@ class PostgresClient {
     demoUsers.forEach(user => {
       this.users.set(user.id, user);
       this.credentials.set(user.email, 'password123');
-      
+
       this.configs.set(user.id, {
         userId: user.id,
         name: user.id === 'u_demo' ? "Gourmet Garden AR" : "Bistro Digitale",
