@@ -13,6 +13,8 @@ import Button from '@/shared/components/ui/Button';
 import Card from '@/shared/components/ui/Card';
 import QRGenerator from '@/shared/components/QRGenerator';
 import Badge from '@/shared/components/ui/Badge';
+import Toast from '@/shared/components/Toast';
+import { useToastStore } from '@/stores/useToastStore';
 
 // Views
 import LandingView from '@/features/landing/LandingView';
@@ -103,8 +105,10 @@ const App: React.FC = () => {
     reader.onload = async (ev) => {
       try {
         const dish = await ApiService.analyzeMenuImage(currentUser.id, ev.target?.result as string);
-        setMenu(p => [...p, dish]);
-      } catch (err) { alert("Failed to analyze image."); }
+        addToast(`${dish.name} added to menu!`, "success");
+      } catch (err) {
+        addToast("Failed to analyze image.", "error");
+      }
       finally { setIsProcessing(false); }
     };
     reader.readAsDataURL(file);
@@ -112,8 +116,12 @@ const App: React.FC = () => {
 
   const handleSaveConfig = async () => {
     if (!currentUser) return;
-    await ApiService.saveConfig(config);
-    alert("Configuration saved!");
+    try {
+      await ApiService.saveConfig(config);
+      addToast("Configuration saved!", "success");
+    } catch (e) {
+      addToast("Failed to save configuration", "error");
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -135,26 +143,36 @@ const App: React.FC = () => {
       setCart([]);
       setPaymentStep('selection');
       setView('customer-menu');
-    } finally { setIsProcessing(false); }
+    } finally {
+      setIsProcessing(false);
+      addToast("Order placed successfully!", "success");
+    }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     loadOwnerData(DEFAULT_DEMO_USER);
     setView('landing');
+    addToast("Logged out successfully", "info");
   };
 
-  if (view === 'landing') {
-    return <LandingView onOwnerClick={() => setView('auth')} onCustomerClick={() => { setSelectedTable(1); setView('customer-menu'); }} />;
-  }
+  const { addToast } = useToastStore();
 
-  if (view === 'auth') {
-    return <AuthView onSuccess={(user) => { setCurrentUser(user); setView('owner-setup'); }} onBack={() => setView('landing')} />;
-  }
+  const handleAuthSuccess = (user: User) => {
+    setCurrentUser(user);
+    setView('owner-setup');
+    addToast(`Welcome back, ${user.name}!`, "success");
+  };
 
+  const handleCustomerEnter = () => {
+    setSelectedTable(1);
+    setView('customer-menu');
+    addToast("Welcome! Browse our 3D menu.", "info");
+  };
   if (view === 'owner-setup' && currentUser) {
     return (
       <div className="min-h-screen bg-gray-50 pb-20">
+        <Toast />
         <Header
           title="Owner Setup"
           subtitle={currentUser.name}
@@ -258,6 +276,7 @@ const App: React.FC = () => {
   if (view === 'owner-dashboard' && currentUser) {
     return (
       <div className="min-h-screen bg-[#050505] text-white">
+        <Toast />
         <Header
           title="Kitchen Feed"
           subtitle="Real-time Flow"
@@ -282,6 +301,7 @@ const App: React.FC = () => {
   if (view === 'customer-menu') {
     return (
       <div className="min-h-screen bg-white pb-32">
+        <Toast />
         <Header
           title={config.name}
           subtitle={`Table T${selectedTable}`}
@@ -347,6 +367,7 @@ const App: React.FC = () => {
     const tax = subtotal * 0.05;
     return (
       <div className="min-h-screen bg-gray-50 pb-20">
+        <Toast />
         <Header title="Checkout" onBack={() => setView('customer-menu')} />
         <main className="max-w-xl mx-auto p-4 sm:p-10 space-y-6">
           {paymentStep === 'selection' && (
@@ -398,6 +419,24 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
+    );
+  }
+
+  if (view === 'landing') {
+    return (
+      <>
+        <LandingView onOwnerClick={() => setView('auth')} onCustomerClick={handleCustomerEnter} />
+        <Toast />
+      </>
+    );
+  }
+
+  if (view === 'auth') {
+    return (
+      <>
+        <AuthView onSuccess={handleAuthSuccess} onBack={() => setView('landing')} />
+        <Toast />
+      </>
     );
   }
 

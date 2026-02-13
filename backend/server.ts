@@ -5,6 +5,7 @@ import { config as loadEnv } from 'dotenv';
 import { processMenuUpload, fetchMenu } from './menuController';
 import { createNewOrder, getLiveOrders, updateStatus } from './orderController';
 import { AuthRepository, ConfigRepository } from '../database/repositories';
+import { seedDemoData } from './db/seed';
 import type { Order, OrderItem, PaymentMethod, RestaurantConfig, UserId } from '../src/shared/types';
 
 loadEnv({ path: process.env.ENV_FILE ?? '.env.local' });
@@ -22,6 +23,16 @@ app.use(
   })
 );
 app.use(express.json({ limit: '15mb' }));
+
+// Simple Request Logger
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`);
+  });
+  next();
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
@@ -152,7 +163,10 @@ app.patch('/api/users/:userId/orders/:orderId/status', async (req, res) => {
 });
 
 const port = Number(process.env.PORT ?? 4000);
-app.listen(port, () => {
+app.listen(port, async () => {
   // eslint-disable-next-line no-console
   console.log(`Backend API listening on http://localhost:${port}`);
+
+  // Seed demo data if needed
+  await seedDemoData();
 });
