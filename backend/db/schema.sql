@@ -26,12 +26,13 @@ CREATE TABLE IF NOT EXISTS dishes (
     description TEXT,
     price DECIMAL(10, 2) NOT NULL,
     category TEXT NOT NULL,
-    images TEXT[], -- Array of image URLs
+    images TEXT[], -- Array of image URLs (stored in S3-compatible blob storage)
     portion_size TEXT,
     is_ar_ready BOOLEAN DEFAULT false,
     ar_model_url TEXT,
-    model_generation_status TEXT,
-    generation_progress INTEGER,
+    model_generation_status TEXT DEFAULT 'pending',
+    generation_progress INTEGER DEFAULT 0,
+    geometric_prompt TEXT, -- 3D generation instructions from AI analysis
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

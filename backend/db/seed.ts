@@ -2,6 +2,9 @@ import { db } from "../../database/dbClient";
 import { Dish } from "../../src/shared/types";
 
 const DEMO_USER_ID = "u_demo";
+const DEMO_EMAIL = "demo@ardine.com";
+const DEMO_NAME = "Gourmet Garden";
+const DEMO_PASS = "password123";
 
 const DEMO_DISHES: Partial<Dish>[] = [
     {
@@ -11,7 +14,7 @@ const DEMO_DISHES: Partial<Dish>[] = [
         category: "Main",
         images: ["https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=1000&auto=format&fit=crop"],
         isARReady: true,
-        arModelUrl: "https://modelviewer.dev/shared-assets/models/Astronaut.glb", // Using Astro as placeholder
+        arModelUrl: "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
         modelGenerationStatus: "ready",
         generationProgress: 100
     },
@@ -42,29 +45,34 @@ const DEMO_DISHES: Partial<Dish>[] = [
 export const seedDemoData = async () => {
     console.log("Seeding demo data...");
     try {
-        // Check if demo user has dishes
+        // Check if demo user already has dishes
         const existing = await db.queryDishes(DEMO_USER_ID);
         if (existing.length > 0) {
             console.log("Demo data already exists. Skipping.");
             return;
         }
 
-        // Create demo user config if not exists
-        const config = await db.getConfig(DEMO_USER_ID);
-        if (!config) {
-            await db.saveConfig({
-                userId: DEMO_USER_ID,
-                restaurant_name: "Gourmet Garden",
-                tables_count: 8
-            } as any);
+        // Create demo user (ignore if already exists)
+        try {
+            await db.createUser(DEMO_EMAIL, DEMO_NAME, DEMO_PASS);
+        } catch {
+            // User may already exist — that's fine
         }
+
+        // Create demo config
+        await db.saveConfig({
+            userId: DEMO_USER_ID,
+            name: "Gourmet Garden AR",
+            tables: 8
+        });
 
         // Seed dishes
         for (const dish of DEMO_DISHES) {
             await db.insertDish({
                 ...dish,
                 id: `demo_${Math.random().toString(36).substr(2, 9)}`,
-                userId: DEMO_USER_ID
+                userId: DEMO_USER_ID,
+                portionSize: dish.portionSize ?? 'Regular',
             } as Dish);
         }
 

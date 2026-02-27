@@ -1,6 +1,6 @@
 # AR-Dine: Interactive Menu & Ordering
 
-An AI-powered AR menu experience for restaurants with separate views for customers and owners.
+An AI-powered AR menu experience for restaurants with separate views for customers and owners. Fully containerized, platform-agnostic architecture deployable on Azure, AWS, or GCP.
 
 ## 📁 Project Structure
 
@@ -18,162 +18,324 @@ ARDine/
 │   │   ├── services/       # API clients
 │   │   └── types.ts        # TypeScript types
 │   ├── stores/             # Zustand state management
-│   │   ├── useAuthStore.ts
-│   │   ├── useCartStore.ts
-│   │   └── useOwnerStore.ts
-│   ├── App.tsx
-│   └── main.tsx
-├── backend/                 # Express backend
-│   ├── db/                 # Database setup
-│   ├── menuController.ts
-│   ├── orderController.ts
-│   └── server.ts
+│   └── App.tsx
+├── backend/                 # Express backend + worker
+│   ├── db/                 # Database setup & seed
+│   ├── menuController.ts   # Image → AI → MinIO → BullMQ enqueue
+│   ├── orderController.ts  # Order CRUD + status transitions
+│   ├── server.ts           # Express API with helmet, rate limiting
+│   ├── worker.ts           # BullMQ consumer for 3D model generation
+│   ├── queue.ts            # Shared queue config & job types
+│   ├── storageClient.ts    # S3-compatible blob storage client
+│   ├── scannerClient.ts    # ClamAV malware scanning client
+│   ├── instrumentation.ts  # OpenTelemetry auto-instrumentation
+│   ├── aiClient.ts         # Gemini AI client factory
+│   └── validators.ts       # Magic-byte + size validation
 ├── database/               # Data-access boundary
-│   ├── dbClient.ts        # Demo/in-memory DB (Map-backed)
-│   └── repositories.ts
-└── index.html
+│   ├── dbClient.ts        # PostgreSQL client (pg Pool)
+│   └── repositories.ts    # Repository pattern CRUD layer
+├── docker/                 # Container configuration
+│   ├── nginx.conf         # Frontend reverse proxy config
+│   └── otel-collector-config.yaml
+├── helm/                   # Kubernetes Helm chart
+│   └── ardine/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── templates/     # Deployment, Service, Ingress, etc.
+├── Dockerfile.frontend     # Multi-stage: Vite build → Nginx
+├── Dockerfile.backend      # Node 22 alpine → Express API
+├── Dockerfile.worker       # Node 22 alpine → BullMQ consumer
+├── docker-compose.yml      # Local orchestration (8 services)
+└── .env.example           # All environment variables documented
 ```
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 18+ 
-- Gemini API key (only required for menu photo → AI analysis)
-- (Optional) PostgreSQL connection string if you want to run `npm run db:setup`
-
-### Installation
-
-1. **Clone and install dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Set up environment variables:**
-   ```bash
-   cp .env.local.example .env.local
-   ```
-   
-   Edit `.env.local` and add:
-   - `GEMINI_API_KEY` (or `API_KEY`) for backend AI calls
-   - `CORS_ORIGIN` if your frontend is not on `http://localhost:3000`
-   - `VITE_API_BASE_URL` only if you are not using the Vite dev proxy
-
-3. **(Optional) Set up a Postgres schema:**
-   ```bash
-   npm run db:setup
-   ```
-   Note: the running app currently uses the demo/in-memory store in `database/dbClient.ts`. The `db:setup` script only applies SQL migrations; wiring runtime queries to Postgres is a separate step.
-
-4. **Start development servers:**
-   
-   Terminal 1 (Frontend):
-   ```bash
-   npm run dev
-   ```
-   
-   Terminal 2 (Backend):
-   ```bash
-   npm run backend:dev
-   ```
-
-5. **Access the application:**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:4000
 
 ## 🏗️ Architecture
 
-### High-level flow
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Frontend   │────▶│   Backend    │────▶│    Worker    │
+│  (Nginx:80)  │     │(Express:4000)│     │  (BullMQ)    │
+└──────────────┘     └──────┬───────┘     └──────┬───────┘
+                            │                     │
+              ┌─────────────┼─────────────────────┤
+              ▼             ▼                     ▼
+        ┌──────────┐  ┌──────────┐         ┌──────────┐
+        │PostgreSQL│  │  Redis   │         │  MinIO   │
+        │  :5432   │  │  :6379   │         │(S3):9000 │
+        └──────────┘  └──────────┘         └──────────┘
+                                                │
+                      ┌──────────┐         ┌────┴─────┐
+                      │  OTel    │         │  ClamAV  │
+                      │Collector │         │  :3310   │
+                      │:4317/4318│         └──────────┘
+                      └──────────┘
+```
 
-- The React SPA (Vite) calls the backend via `src/shared/services/api.ts`.
-- The Express API in `backend/server.ts` routes requests to controllers.
-- Controllers validate inputs (`backend/validators.ts`), orchestrate AI where needed, and persist via repositories (`database/repositories.ts`).
-- Shared types live in `src/shared/types.ts` (imported via the `@/` alias).
+### Data Flow
 
-### State Management (Zustand)
+1. **React SPA** → calls `src/shared/services/api.ts` → Nginx reverse-proxies `/api` to backend
+2. **Express API** → validates input → scans images with ClamAV → uploads to MinIO (S3-compatible) → analyzes with Gemini AI → enqueues BullMQ job
+3. **Worker** → picks up job from Redis → simulates/generates 3D model → scans `.glb` with ClamAV → uploads to MinIO → updates PostgreSQL
+4. **Frontend polls** `/api/users/:id/menu` every 5s until `modelGenerationStatus === 'ready'`
+5. **AR Viewer** → renders `arModelUrl` (MinIO URL proxied via `/storage`) in `<model-viewer>` web component
 
-- **useAuthStore**: Manages user authentication and session
-- **useCartStore**: Handles customer cart operations
-- **useOwnerStore**: Manages owner dashboard data (menu, orders, config)
+### Platform-Agnostic Design
 
-### Database Schema
+Every component uses open standards — **no cloud vendor lock-in**:
 
-- Runtime: demo/in-memory store in `database/dbClient.ts`.
-- Migrations: optional SQL schema in `backend/db/schema.sql` runnable via `npm run db:setup`.
+| Component | Local (Docker Compose) | Azure | AWS | GCP |
+|-----------|----------------------|-------|-----|-----|
+| Database | `postgres:16-alpine` | Azure DB for PostgreSQL | RDS / Aurora | Cloud SQL |
+| Queue | `redis:7-alpine` | Azure Cache for Redis | ElastiCache | Memorystore |
+| Blob Storage | `minio/minio` (S3 API) | Azure Blob (S3 gateway) | S3 | Cloud Storage |
+| Malware Scan | `clamav/clamav` | Defender for Storage | GuardDuty | SCC |
+| Observability | OTel Collector | Azure Monitor | X-Ray | Cloud Trace |
+| Orchestration | Docker Compose | AKS | EKS | GKE |
 
-## 📦 Deployment
+Only the **connection strings / env vars** change between environments — zero code changes.
 
-### Frontend (GitHub Pages)
+## 🚀 Getting Started
 
-This repo includes a GitHub Actions workflow that builds the Vite app and deploys `dist/` to GitHub Pages on pushes to `main`.
+### Option 1: Docker Compose (Recommended)
 
-1. In GitHub, enable Pages for the repo:
-   - **Settings → Pages → Build and deployment → Source: GitHub Actions**
-2. Ensure your backend is deployed somewhere reachable via HTTPS.
-3. Set `VITE_API_BASE_URL` to your backend origin for production builds.
-   - Example: `https://your-backend.example.com`
-   - Note: GitHub Pages cannot host the Express backend.
+Run the entire stack locally with a single command:
 
-### Backend (Render)
+```bash
+# 1. Copy and configure environment variables
+cp .env.example .env
+# Edit .env — at minimum set GEMINI_API_KEY
 
-1. Create a new Web Service on Render
-2. Connect your GitHub repository
-3. Set build command: `npm install`
-4. Set start command: `npm run backend:start`
-5. Add environment variables:
-   - `GEMINI_API_KEY` (or `API_KEY`)
-   - `PORT=4000`
-   - `CORS_ORIGIN`: Your frontend URL
+# 2. Start all 8 containers
+docker compose up --build
 
-### Database (Optional)
+# 3. Access the app
+#    Frontend:       http://localhost
+#    Backend API:    http://localhost:4000
+#    MinIO Console:  http://localhost:9001 (minioadmin / minioadmin)
+#    PostgreSQL:     localhost:5432
 
-- If you only need the demo behavior, no external DB is required.
-- If you want a Postgres schema ready for a real DB, set `DATABASE_URL` and run `npm run db:setup`.
+# Scale workers for parallel 3D generation
+docker compose up --scale worker=3
+
+# Tear down
+docker compose down
+```
+
+**What starts:** Frontend (Nginx), Backend (Express), Worker (BullMQ), PostgreSQL, Redis, MinIO, ClamAV, OpenTelemetry Collector.
+
+### Option 2: Local Development (without Docker)
+
+For iterating on code without rebuilding containers:
+
+```bash
+# Prerequisites: Node.js 22+, running PostgreSQL, Redis, MinIO instances
+
+npm install
+
+# Set up environment
+cp .env.example .env.local
+# Edit .env.local with local connection strings
+
+# Terminal 1: Frontend (Vite dev server with HMR)
+npm run dev
+
+# Terminal 2: Backend API
+npm run backend:dev
+
+# Terminal 3: 3D Worker
+npm run worker:dev
+```
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:4000 |
+
+### Environment Variables
+
+All variables are documented in `.env.example`. Key ones:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | Yes | Google Gemini API key (server-side only) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `REDIS_URL` | Yes | Redis connection string for BullMQ |
+| `S3_ENDPOINT` | Yes | MinIO / S3-compatible endpoint |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | Yes | Blob storage credentials |
+| `CLAMAV_HOST` | No | ClamAV daemon host (default: `clamav`) |
+| `STORAGE_PUBLIC_URL` | No | Public base URL for stored files |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | OpenTelemetry collector endpoint |
+
+## 🐳 Container Architecture
+
+### Services (docker-compose.yml)
+
+| Service | Image | Ports | Purpose |
+|---------|-------|-------|---------|
+| `frontend` | `Dockerfile.frontend` | `80` | Nginx SPA + reverse proxy |
+| `backend` | `Dockerfile.backend` | `4000` | Express API server |
+| `worker` | `Dockerfile.worker` | — | BullMQ 3D generation consumer |
+| `db` | `postgres:16-alpine` | `5432` | Persistent relational data |
+| `redis` | `redis:7-alpine` | `6379` | Job queue (BullMQ) broker |
+| `minio` | `minio/minio` | `9000` / `9001` | S3-compatible blob storage |
+| `clamav` | `clamav/clamav:stable` | `3310` | Malware scanning daemon |
+| `otel-collector` | `otel/opentelemetry-collector-contrib` | `4317` / `4318` | Telemetry collection |
+
+### Blob Storage (MinIO — S3-compatible)
+
+Two buckets are auto-created on startup:
+- **`dish-images`** — 2D dish photos (uploaded during menu analysis)
+- **`dish-models`** — `.glb` 3D model files (generated by worker)
+
+The `storageClient.ts` uses `@aws-sdk/client-s3` — works unchanged against MinIO, AWS S3, GCS (HMAC), or Azure Blob (S3 gateway).
+
+### Message Queue (Redis + BullMQ)
+
+The 3D model generation pipeline is decoupled from the API:
+
+1. `POST /api/users/:id/menu/analyze` → saves dish → enqueues `model-generation` job
+2. Worker picks up job → generates model → scans with ClamAV → uploads `.glb` → updates DB
+3. Frontend polls until `modelGenerationStatus === 'ready'`
+
+Jobs support: 3 retries with exponential backoff, rate limiting (10/min), progress tracking.
+
+### Security Scanning (ClamAV)
+
+All user-uploaded files are scanned **before** being written to blob storage:
+- 2D images: scanned in the `/analyze` API endpoint
+- 3D models: scanned in the worker before upload
+
+If ClamAV is unavailable, behavior is configurable via `CLAMAV_REQUIRED=true` (fail hard) or default (warn and skip).
+
+### Observability (OpenTelemetry)
+
+Auto-instrumented traces/metrics for Express, `pg`, `ioredis`, and HTTP calls. The collector config (`docker/otel-collector-config.yaml`) exports to console by default — uncomment the relevant exporter for production:
+
+```yaml
+# Azure Monitor:
+# azuremonitor:
+#   connection_string: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+
+# AWS X-Ray:
+# awsxray:
+#   region: ${AWS_REGION}
+
+# GCP Cloud Trace:
+# googlecloud:
+#   project: ${GCP_PROJECT_ID}
+```
+
+## ☸️ Kubernetes Deployment (Helm)
+
+A Helm chart is provided in `helm/ardine/` for deploying to any managed Kubernetes cluster (AKS, EKS, GKE).
+
+```bash
+# Build and push images to your OCI registry
+docker build -f Dockerfile.frontend -t ghcr.io/your-org/ardine-frontend:latest .
+docker build -f Dockerfile.backend  -t ghcr.io/your-org/ardine-backend:latest .
+docker build -f Dockerfile.worker   -t ghcr.io/your-org/ardine-worker:latest .
+
+# Deploy to cluster
+helm install ardine ./helm/ardine \
+  --set secrets.geminiApiKey=YOUR_KEY \
+  --set image.frontend.repository=ghcr.io/your-org/ardine-frontend \
+  --set image.backend.repository=ghcr.io/your-org/ardine-backend \
+  --set image.worker.repository=ghcr.io/your-org/ardine-worker
+```
+
+### Using Managed Services (Production)
+
+Disable containerized infra and point to managed equivalents:
+
+```yaml
+# values.yaml overrides for production
+postgresql:
+  enabled: false
+externalDatabase:
+  host: your-db.postgres.database.azure.com
+  password: xxx
+
+redis:
+  enabled: false
+externalRedis:
+  host: your-cache.redis.cache.windows.net
+
+minio:
+  enabled: false
+externalStorage:
+  endpoint: https://s3.amazonaws.com
+  accessKey: xxx
+  secretKey: xxx
+  forcePathStyle: false
+```
 
 ## 🛠️ Development
 
 ### Available Scripts
 
-- `npm run dev` - Start frontend dev server
-- `npm run backend:dev` - Start backend dev server
-- `npm run typecheck` - Run TypeScript type checking
-- `npm run build` - Build for production
-- `npm run db:setup` - Initialize database schema
+| Script | Command | Description |
+|--------|---------|-------------|
+| `npm run dev` | `vite` | Frontend dev server (port 3000) |
+| `npm run backend:dev` | `tsx backend/server.ts` | Backend API server (port 4000) |
+| `npm run worker:dev` | `tsx backend/worker.ts` | 3D model worker |
+| `npm run build` | `vite build` | Production frontend build |
+| `npm run typecheck` | `tsc --noEmit` | TypeScript type checking |
+| `npm run verify` | typecheck + build | CI verification |
+| `npm run db:setup` | `tsx backend/db/setup.ts` | Apply SQL schema to PostgreSQL |
+| `npm run docker:up` | `docker compose up --build` | Start all containers |
+| `npm run docker:down` | `docker compose down` | Stop all containers |
+| `npm run docker:logs` | `docker compose logs -f` | Tail all container logs |
 
 ### Code Organization
 
 - **Features are isolated**: Each feature (auth, customer, owner) has its own directory
-- **Shared code is centralized**: Common components, types, and services are in `src/shared/`
+- **Shared code is centralized**: Common components, types, and services in `src/shared/`
 - **State is managed globally**: Zustand stores provide global state management
-- **Backend is modular**: Controllers handle business logic, repositories handle data access
+- **Backend is modular**: Controllers → Validators → Repositories → DB Client
+- **Worker is decoupled**: 3D generation runs in a separate container via BullMQ
+- **Storage is abstracted**: S3-compatible client works with MinIO, AWS S3, GCS, Azure Blob
+
+### Security Measures
+
+| Layer | Implementation |
+|-------|---------------|
+| HTTP headers | `helmet` middleware (CSP, X-Frame-Options, etc.) |
+| Rate limiting | `express-rate-limit` — 200 req/15min general, 20 req/15min for AI |
+| Image validation | Magic-byte verification (PNG/JPEG/WebP), 5 MB size cap |
+| Malware scanning | ClamAV INSTREAM protocol on all uploads |
+| SQL injection | Parameterized queries throughout `dbClient.ts` |
+| Secrets | Server-side only — never shipped to browser bundles |
 
 ## 🔑 Key Features
 
 ### For Customers
 - Browse AR-enabled menu
-- View 3D models of dishes
+- View 3D models of dishes in augmented reality
 - Add items to cart
-- Place orders with multiple payment methods
+- Place orders with multiple payment methods (UPI, Card, Cash, Wallet)
 
 ### For Owners
-- Upload menu photos (AI generates dish data)
+- Upload menu photos — AI generates dish metadata + 3D generation prompt
+- Track 3D model generation progress in real-time
 - Manage restaurant configuration
-- View live orders dashboard
+- View live orders dashboard with status transitions
 - Generate QR codes for tables
 
 ## 📝 Notes
 
-- The current runtime DB behavior is demo/in-memory (Map-backed)
-- AI-powered dish analysis uses Google Gemini
-- 3D model generation is simulated (integrate with real 3D API for production)
-- Authentication is basic (implement proper JWT/OAuth for production)
+- **Database**: PostgreSQL with parameterized queries (previously in-memory Maps)
+- **AI**: Google Gemini API for dish photo analysis (API key-based, works from any cloud)
+- **3D Models**: Generation pipeline runs in a separate worker container via BullMQ queue. Currently uses a placeholder model — replace `fetchPlaceholderModel()` in `backend/worker.ts` with a real pipeline (Shap-E, TripoSR, etc.)
+- **Auth**: Basic email/password — implement proper JWT/OAuth for production
+- **ClamAV cold start**: Takes ~60–120s on first boot to download virus definitions. The health check has a `start_period` of 120s
 
 ## 🤝 Contributing
 
 1. Create a feature branch
 2. Make your changes
-3. Run `npm run typecheck` to verify
-4. Submit a pull request
+3. Run `npm run verify` (typecheck + build)
+4. Run `docker compose up --build` to validate containers
+5. Submit a pull request
 
 ## 📄 License
 

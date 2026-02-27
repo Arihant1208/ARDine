@@ -1,11 +1,15 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { config as loadEnv } from 'dotenv';
 
 import { processMenuUpload, fetchMenu } from './menuController';
 import { createNewOrder, getLiveOrders, updateStatus } from './orderController';
 import { AuthRepository, ConfigRepository } from '../database/repositories';
 import { seedDemoData } from './db/seed';
+import { pingClamAV } from './scannerClient';
+import { bucketExists, BUCKET_IMAGES, BUCKET_MODELS } from './storageClient';
 import type { Order, OrderItem, PaymentMethod, RestaurantConfig, UserId } from '../src/shared/types';
 
 loadEnv({ path: process.env.ENV_FILE ?? '.env.local' });
@@ -24,6 +28,40 @@ app.use(
 );
 app.use(express.json({ limit: '15mb' }));
 
+// Security headers (platform-agnostic)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https://*"],
+      connectSrc: ["'self'", "https://*"],
+      frameSrc: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Required for model-viewer
+}));
+
+// Rate limiting — AI analysis endpoint gets stricter limits
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // Max 20 AI analysis requests per 15 min
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'AI analysis rate limit exceeded' },
+});
+
+app.use('/api/', generalLimiter);
+
 // Simple Request Logger
 app.use((req, res, next) => {
   const start = Date.now();
@@ -34,8 +72,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true });
+app.get('/api/health', async (_req, res) => {
+  const checks = {
+    api: true,
+    clamav: await pingClamAV().catch(() => false),
+    storage: await bucketExists(BUCKET_IMAGES).catch(() => false),
+  };
+  const healthy = Object.values(checks).every(Boolean);
+  res.status(healthy ? 200 : 503).json({ ok: healthy, checks });
 });
 
 // Auth
@@ -76,7 +120,7 @@ app.get('/api/users/:userId/menu', async (req, res) => {
   }
 });
 
-app.post('/api/users/:userId/menu/analyze', async (req, res) => {
+app.post('/api/users/:userId/menu/analyze', aiLimiter, async (req, res) => {
   try {
     const userId = req.params.userId as UserId;
     const { base64 } = req.body as { base64?: string };

@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app.kubernetes.io/name: ardine
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  PORT: "4000"
+  CORS_ORIGIN: "*"
+  S3_REGION: {{ .Values.externalStorage.region | default "us-east-1" | quote }}
+  S3_BUCKET_IMAGES: "dish-images"
+  S3_BUCKET_MODELS: "dish-models"
+  CLAMAV_HOST: "{{ .Release.Name }}-clamav"
+  CLAMAV_PORT: "3310"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
+  STORAGE_PUBLIC_URL: {{ .Values.env.STORAGE_PUBLIC_URL | quote }}
+  {{- if .Values.minio.enabled }}
+  S3_ENDPOINT: "http://{{ .Release.Name }}-minio:9000"
+  S3_FORCE_PATH_STYLE: "true"
+  {{- else }}
+  S3_ENDPOINT: {{ .Values.externalStorage.endpoint | quote }}
+  S3_FORCE_PATH_STYLE: {{ .Values.externalStorage.forcePathStyle | quote }}
+  {{- end }}

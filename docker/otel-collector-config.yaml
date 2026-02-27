@@ -1,0 +1,62 @@
+# OpenTelemetry Collector configuration
+# Platform-agnostic: swap exporters for Azure Monitor, AWS X-Ray, or GCP Cloud Trace
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+exporters:
+  # Default: log to console (development)
+  debug:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # --- Cloud-specific exporters (uncomment one for production) ---
+
+  # Azure Monitor:
+  # azuremonitor:
+  #   connection_string: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+
+  # AWS X-Ray:
+  # awsxray:
+  #   region: ${AWS_REGION}
+
+  # GCP Cloud Trace:
+  # googlecloud:
+  #   project: ${GCP_PROJECT_ID}
+
+  # Self-hosted Jaeger (works anywhere):
+  # otlp/jaeger:
+  #   endpoint: jaeger:4317
+  #   tls:
+  #     insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

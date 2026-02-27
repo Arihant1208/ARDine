@@ -1,0 +1,145 @@
+# Default values for ARDine Helm chart.
+# Platform-agnostic: deploy to AKS, EKS, or GKE with identical values.
+
+# ── Global ──────────────────────────────────────────────────────────────────
+
+replicaCount:
+  backend: 2
+  worker: 2
+  frontend: 2
+
+image:
+  registry: ghcr.io
+  # Set these per environment:
+  frontend:
+    repository: your-org/ardine-frontend
+    tag: latest
+  backend:
+    repository: your-org/ardine-backend
+    tag: latest
+  worker:
+    repository: your-org/ardine-worker
+    tag: latest
+  pullPolicy: IfNotPresent
+
+# ── Services ────────────────────────────────────────────────────────────────
+
+frontend:
+  service:
+    type: ClusterIP
+    port: 80
+
+backend:
+  service:
+    type: ClusterIP
+    port: 4000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+worker:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 1Gi
+
+# ── Ingress ─────────────────────────────────────────────────────────────────
+
+ingress:
+  enabled: true
+  className: nginx  # Works on AKS, EKS, GKE with nginx-ingress controller
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+  hosts:
+    - host: ardine.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+        - path: /storage
+          pathType: Prefix
+          service: minio
+  tls: []
+
+# ── PostgreSQL (Bitnami subchart or external) ───────────────────────────────
+
+postgresql:
+  enabled: true  # Set false to use managed DB (RDS, Cloud SQL, Azure DB)
+  auth:
+    postgresPassword: ardine_secret
+    username: ardine
+    password: ardine_secret
+    database: ardine
+
+# When postgresql.enabled=false, set this:
+externalDatabase:
+  host: ""
+  port: 5432
+  user: ardine
+  password: ""
+  database: ardine
+
+# ── Redis (Bitnami subchart or external) ────────────────────────────────────
+
+redis:
+  enabled: true  # Set false to use managed Redis (ElastiCache, Memorystore, Azure Cache)
+  auth:
+    enabled: false
+
+externalRedis:
+  host: ""
+  port: 6379
+
+# ── MinIO (subchart or external S3) ─────────────────────────────────────────
+
+minio:
+  enabled: true  # Set false to use managed S3, GCS, or Azure Blob
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  buckets:
+    - name: dish-images
+      policy: download
+    - name: dish-models
+      policy: download
+
+externalStorage:
+  endpoint: ""
+  accessKey: ""
+  secretKey: ""
+  region: us-east-1
+  forcePathStyle: false
+
+# ── ClamAV ──────────────────────────────────────────────────────────────────
+
+clamav:
+  enabled: true
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# ── OpenTelemetry Collector ─────────────────────────────────────────────────
+
+otelCollector:
+  enabled: true
+
+# ── Environment / Secrets ───────────────────────────────────────────────────
+
+secrets:
+  geminiApiKey: ""  # Set via --set secrets.geminiApiKey=xxx or external secret manager
+
+env:
+  STORAGE_PUBLIC_URL: "https://ardine.local/storage"

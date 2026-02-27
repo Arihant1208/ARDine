@@ -4,17 +4,43 @@ import { getAIClient } from "./aiClient";
 import { Dish, UserId } from "../src/shared/types";
 import { validateMenuImage } from "./validators";
 import { MenuRepository } from "../database/repositories";
+import { uploadFile, BUCKET_IMAGES } from "./storageClient";
+import { scanBuffer } from "./scannerClient";
+import { enqueueModelGeneration } from "./queue";
 
 export const processMenuUpload = async (userId: UserId, base64Image: string): Promise<Dish> => {
   if (!validateMenuImage(base64Image)) {
     throw new Error("Invalid image format");
   }
 
-  const ai = getAIClient();
+  // Step 1: Decode and scan the image with ClamAV
   const imageData = base64Image.split(',')[1];
+  const imageBuffer = Buffer.from(imageData, 'base64');
 
-  // Pass 1: Semantic Analysis and 3D Modeling Prompt
-  // This extracts the specific geometric instructions needed for a custom 3D pipeline
+  try {
+    const scanResult = await scanBuffer(imageBuffer);
+    if (!scanResult.clean) {
+      throw new Error(`Image failed security scan: ${scanResult.detail}`);
+    }
+  } catch (err) {
+    // If ClamAV is unavailable, log warning but don't block in development
+    const isCritical = process.env.CLAMAV_REQUIRED === 'true';
+    if (isCritical) throw err;
+    console.warn(`[Menu] ClamAV unavailable, skipping scan: ${(err as Error).message}`);
+  }
+
+  // Step 2: Upload image to S3-compatible blob storage (MinIO locally)
+  const imageId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const mimeMatch = base64Image.match(/^data:image\/(png|jpeg|jpg|webp);base64,/);
+  const ext = mimeMatch?.[1] === 'jpeg' ? 'jpg' : (mimeMatch?.[1] ?? 'jpg');
+  const objectKey = `${userId}/${imageId}.${ext}`;
+  const contentType = `image/${mimeMatch?.[1] ?? 'jpeg'}`;
+
+  const imageUrl = await uploadFile(BUCKET_IMAGES, objectKey, imageBuffer, contentType);
+
+  // Step 3: AI analysis — pass raw base64 to Gemini (not the stored URL)
+  const ai = getAIClient();
+
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: {
@@ -42,11 +68,12 @@ export const processMenuUpload = async (userId: UserId, base64Image: string): Pr
 
   const aiResult = JSON.parse(response.text || "{}");
 
+  // Step 4: Save dish with blob storage URL (not base64)
   const initialDish: Dish = {
     id: `dish_${Date.now()}`,
     userId,
     ...aiResult,
-    images: [base64Image],
+    images: [imageUrl], // URL to MinIO/S3, not base64
     isARReady: false,
     modelGenerationStatus: 'generating',
     generationProgress: 10,
@@ -55,40 +82,17 @@ export const processMenuUpload = async (userId: UserId, base64Image: string): Pr
 
   const savedDish = await MenuRepository.save(initialDish);
 
-  // Background 3D Generation Simulation (Custom Pipeline)
-  // In production, this would dispatch the 'geometricPrompt' to a worker or cloud service like Sketchfab's conversion API
-  simulateThreeDPipeline(userId, savedDish.id);
+  // Step 5: Enqueue 3D model generation job via BullMQ (instead of in-process setTimeout)
+  await enqueueModelGeneration({
+    dishId: savedDish.id,
+    userId,
+    geometricPrompt: aiResult.geometricPrompt,
+    imageUrl,
+  });
 
   return savedDish;
 };
 
-const simulateThreeDPipeline = async (userId: UserId, dishId: string) => {
-  const steps = [
-    { progress: 20, status: 'generating' as const },
-    { progress: 45, status: 'generating' as const },
-    { progress: 75, status: 'generating' as const },
-    { progress: 90, status: 'generating' as const },
-    { progress: 100, status: 'ready' as const }
-  ];
-
-  for (const step of steps) {
-    // Artificial delay to simulate heavy 3D processing (Photogrammetry, Mesh optimization, GLB packing)
-    await new Promise(resolve => setTimeout(resolve, 4000 + Math.random() * 2000));
-
-    const updates: Partial<Dish> = {
-      generationProgress: step.progress,
-      modelGenerationStatus: step.status
-    };
-
-    if (step.status === 'ready') {
-      updates.isARReady = true;
-      // High-quality GLB file link - In a real app, this would be the actual generated asset URL
-      updates.arModelUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
-    }
-
-    await MenuRepository.updateDishStatus(userId, dishId, updates);
-  }
-};
 
 export const fetchMenu = async (userId: UserId): Promise<Dish[]> => {
   return await MenuRepository.getAll(userId);
