@@ -12,8 +12,9 @@
  * Scale horizontally: docker compose up --scale worker=N
  */
 
-import { config as loadEnv } from 'dotenv';
-loadEnv({ path: process.env.ENV_FILE ?? '.env' });
+// env.ts MUST be the very first import — populates process.env before
+// any module reads it at import time.
+import './env';
 
 import { Worker, Job } from 'bullmq';
 import {

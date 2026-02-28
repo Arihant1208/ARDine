@@ -1,8 +1,10 @@
 # Repo Conventions + Web Security
 
 ## Project Layout
-- Frontend: `src/App.tsx`, `src/features/`, `src/shared/`, `src/stores/`
+- Frontend: `src/App.tsx`, `src/main.tsx`, `src/features/`, `src/shared/`, `src/stores/`
 - Backend API: `backend/server.ts`, `backend/menuController.ts`, `backend/orderController.ts`
+- Auth: `backend/authMiddleware.ts` (JWT), `@react-oauth/google` (frontend)
+- Payments: `backend/stripeClient.ts`, `@stripe/stripe-js` (frontend)
 - Worker: `backend/worker.ts`
 - Infrastructure clients: `backend/storageClient.ts`, `backend/scannerClient.ts`, `backend/queue.ts`
 - Data access: `database/`
@@ -31,26 +33,32 @@
 
 ## Web Security Checklist
 - Secrets never in client bundles:
-  - Do not expose `GEMINI_API_KEY` via Vite `define`.
-  - Use server-side endpoints/proxies for secret-bearing calls.
+  - `GEMINI_API_KEY`, `STRIPE_SECRET_KEY`, `JWT_SECRET` are server-side only.
+  - Only `VITE_GOOGLE_CLIENT_ID` and `VITE_STRIPE_PUBLISHABLE_KEY` are safe for the frontend.
   - Environment variables for all secrets — see `.env.example`.
+- Authentication:
+  - Google OAuth 2.0: ID tokens verified server-side via `google-auth-library`.
+  - JWT tokens signed with HS256, include `userId` + `email`.
+  - `requireAuth` middleware on all owner routes; userId in JWT must match URL param.
+- Payment security:
+  - Stripe PaymentIntents created server-side; frontend confirms via `stripe.js`.
+  - Stripe webhook signature verification using `STRIPE_WEBHOOK_SECRET`.
+  - Webhook route uses `express.raw()` before `express.json()` for raw body access.
 - Input validation everywhere:
-  - Validate URL params (`u`, `table`) and order payloads.
-  - Reject unexpected enum/status transitions.
+  - Validate route params (`:userId`, `:dishId`, `:orderId`) and order payloads.
+  - Reject unexpected enum/status transitions via `ORDER_STATUS_TRANSITIONS`.
+  - Customer info: name required, phone validated against international format.
   - Image uploads: magic-byte verification (PNG/JPEG/WebP), 5 MB size cap.
 - Malware scanning:
   - All uploaded and generated files are scanned by ClamAV before writing to blob storage.
-- HTTP hardening (implemented):
-  - `helmet` middleware adds CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy.
+- HTTP hardening:
+  - `helmet` middleware adds CSP (allows Google + Stripe domains), X-Frame-Options, X-Content-Type-Options.
   - Rate limiting: 200 req/15min general, 20 req/15min for AI endpoints.
 - XSS protections:
   - Avoid `dangerouslySetInnerHTML`.
   - Render untrusted strings as text.
 - Database:
   - All queries use parameterized statements — no SQL injection surface.
-- Auth (when adding real auth):
-  - Use secure sessions or JWT best practices.
-  - Enforce authorization checks on every write.
 
 ## Container Conventions
 - Each Dockerfile uses `node:22-alpine` as the base.

@@ -1,14 +1,13 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChefHat, Settings, ShoppingBag, ChevronRight } from 'lucide-react';
-import Button from '@/shared/components/ui/Button';
 
-interface LandingViewProps {
-  onOwnerClick: () => void;
-  onCustomerClick: () => void;
-}
+const DEFAULT_DEMO_USER = 'u_demo';
 
-const LandingView: React.FC<LandingViewProps> = ({ onOwnerClick, onCustomerClick }) => {
+const LandingView: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white p-10 animate-in fade-in duration-700">
       <div className="w-24 h-24 bg-orange-500 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-2xl shadow-orange-200">
@@ -20,7 +19,7 @@ const LandingView: React.FC<LandingViewProps> = ({ onOwnerClick, onCustomerClick
       </p>
       <div className="flex flex-col gap-5 w-full max-w-sm">
         <button
-          onClick={onOwnerClick}
+          onClick={() => navigate('/auth')}
           className="p-6 bg-gray-50 rounded-3xl border border-gray-100 flex items-center justify-between hover:border-orange-500 transition-all group"
         >
           <div className="flex items-center gap-4">
@@ -34,7 +33,7 @@ const LandingView: React.FC<LandingViewProps> = ({ onOwnerClick, onCustomerClick
         </button>
 
         <button
-          onClick={onCustomerClick}
+          onClick={() => navigate(`/menu/${DEFAULT_DEMO_USER}?table=1`)}
           className="p-6 bg-gray-900 text-white rounded-3xl flex items-center justify-between shadow-2xl group"
         >
           <div className="flex items-center gap-4">

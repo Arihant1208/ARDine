@@ -35,7 +35,7 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ restaurantName, tableCount, u
         const tableNum = i + 1;
         const qrId = `qr-table-${tableNum}`;
         // Including UserID for scoping on the customer end
-        const value = `${window.location.origin}/#/customer?table=${tableNum}&u=${userId}&rest=${encodeURIComponent(restaurantName)}`;
+        const value = `${window.location.origin}/menu/${userId}?table=${tableNum}`;
         
         return (
           <div key={tableNum} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-4 transition-transform hover:scale-105">

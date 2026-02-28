@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { PaymentMethod } from '@/shared/types';
-import { Smartphone, CreditCard, ReceiptText, Wallet as WalletIcon } from 'lucide-react';
+import { Smartphone, CreditCard, ReceiptText } from 'lucide-react';
 
 interface PaymentSelectorProps {
   selected: PaymentMethod;
@@ -12,7 +12,6 @@ const PaymentSelector: React.FC<PaymentSelectorProps> = ({ selected, onSelect })
   const methods: { id: PaymentMethod; label: string; sub: string; icon: any }[] = [
     { id: 'UPI', label: 'UPI Payment', sub: 'Instant Pay via Apps', icon: Smartphone },
     { id: 'Card', label: 'Card Payment', sub: 'Credit / Debit Card', icon: CreditCard },
-    { id: 'Wallet', label: 'App Wallet', sub: 'AR-Dine Balance', icon: WalletIcon },
     { id: 'Cash', label: 'Pay at Counter', sub: 'Order now, pay later', icon: ReceiptText }
   ];
 

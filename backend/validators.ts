@@ -1,5 +1,5 @@
 
-import { Dish, OrderItem } from "../src/shared/types";
+import { Dish, OrderItem, OrderStatus, ORDER_STATUS_TRANSITIONS } from "../src/shared/types";
 
 /** Maximum image size: 5 MB (after base64 decoding). */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -58,4 +58,21 @@ export const validateOrder = (tableNumber: number, items: OrderItem[]): boolean 
     typeof item.quantity === 'number' &&
     item.quantity > 0
   );
+};
+
+/** Validate customer identity fields attached to an order. */
+export const validateCustomerInfo = (name: string | undefined, phone: string | undefined): string | null => {
+  if (!name || name.trim().length < 1) return 'Customer name is required';
+  if (name.trim().length > 100) return 'Customer name too long';
+  if (!phone || phone.trim().length < 1) return 'Customer phone is required';
+  // Accept international formats: 6-15 digits, optional leading +
+  const phoneRegex = /^\+?\d{6,15}$/;
+  if (!phoneRegex.test(phone.replace(/[\s\-()]/g, ''))) return 'Invalid phone number format';
+  return null;
+};
+
+/** Validate that a status transition is allowed by the order state machine. */
+export const validateStatusTransition = (current: OrderStatus, next: OrderStatus): boolean => {
+  const allowed = ORDER_STATUS_TRANSITIONS[current];
+  return allowed ? allowed.includes(next) : false;
 };

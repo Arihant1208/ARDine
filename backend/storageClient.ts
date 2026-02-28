@@ -30,8 +30,8 @@ const s3Config = () => ({
   endpoint: getEnv('S3_ENDPOINT', 'http://minio:9000'),
   region: getEnv('S3_REGION', 'us-east-1'),
   credentials: {
-    accessKeyId: getEnv('S3_ACCESS_KEY', 'minioadmin'),
-    secretAccessKey: getEnv('S3_SECRET_KEY', 'minioadmin'),
+    accessKeyId: getEnv('S3_ACCESS_KEY'),
+    secretAccessKey: getEnv('S3_SECRET_KEY'),
   },
   forcePathStyle: getEnv('S3_FORCE_PATH_STYLE', 'true') === 'true',
 });

@@ -4,7 +4,7 @@ import { Dish } from "../../src/shared/types";
 const DEMO_USER_ID = "u_demo";
 const DEMO_EMAIL = "demo@ardine.com";
 const DEMO_NAME = "Gourmet Garden";
-const DEMO_PASS = "password123";
+const DEMO_GOOGLE_ID = "demo_google_id";
 
 const DEMO_DISHES: Partial<Dish>[] = [
     {
@@ -54,7 +54,11 @@ export const seedDemoData = async () => {
 
         // Create demo user (ignore if already exists)
         try {
-            await db.createUser(DEMO_EMAIL, DEMO_NAME, DEMO_PASS);
+            await db.getPool().query(
+                `INSERT INTO users (id, email, name, google_id) VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (id) DO NOTHING`,
+                [DEMO_USER_ID, DEMO_EMAIL, DEMO_NAME, DEMO_GOOGLE_ID]
+            );
         } catch {
             // User may already exist — that's fine
         }

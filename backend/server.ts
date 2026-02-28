@@ -1,25 +1,30 @@
+// env.ts MUST be the very first import — it calls dotenv before any
+// other module reads process.env at import time (e.g. dbClient.ts).
+import './env';
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { config as loadEnv } from 'dotenv';
+import { OAuth2Client } from 'google-auth-library';
 
-import { processMenuUpload, fetchMenu } from './menuController';
-import { createNewOrder, getLiveOrders, updateStatus } from './orderController';
+import { processMenuUpload, fetchMenu, deleteDish } from './menuController';
+import { createNewOrder, createOrderPaymentIntent, confirmOrderPayment, getLiveOrders, updateStatus, handleStripeWebhook } from './orderController';
 import { AuthRepository, ConfigRepository } from '../database/repositories';
 import { seedDemoData } from './db/seed';
 import { pingClamAV } from './scannerClient';
 import { bucketExists, BUCKET_IMAGES, BUCKET_MODELS } from './storageClient';
-import type { Order, OrderItem, PaymentMethod, RestaurantConfig, UserId } from '../src/shared/types';
-
-loadEnv({ path: process.env.ENV_FILE ?? '.env.local' });
-
-// Back-compat: existing AI client checks API_KEY
-if (!process.env.API_KEY && process.env.GEMINI_API_KEY) {
-  process.env.API_KEY = process.env.GEMINI_API_KEY;
-}
+import { signToken, requireAuth } from './authMiddleware';
+import type { OrderItem, PaymentMethod, RestaurantConfig, UserId, OrderStatus } from '../src/shared/types';
 
 const app = express();
+
+// ── Stripe webhook route (must be BEFORE express.json() to get raw body) ──
+app.post(
+  '/api/webhooks/stripe',
+  express.raw({ type: 'application/json' }),
+  handleStripeWebhook
+);
 
 app.use(
   cors({
@@ -33,11 +38,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://accounts.google.com", "https://js.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://*"],
       connectSrc: ["'self'", "https://*"],
-      frameSrc: ["'self'"],
+      frameSrc: ["'self'", "https://accounts.google.com", "https://js.stripe.com"],
     },
   },
   crossOriginEmbedderPolicy: false, // Required for model-viewer
@@ -82,34 +87,64 @@ app.get('/api/health', async (_req, res) => {
   res.status(healthy ? 200 : 503).json({ ok: healthy, checks });
 });
 
-// Auth
-app.post('/api/auth/login', async (req, res) => {
+// ── Auth ──────────────────────────────────────────────────────────────────
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+app.post('/api/auth/google', async (req, res) => {
   try {
-    const { email, pass } = req.body as { email?: string; pass?: string };
-    if (!email || !pass) return res.status(400).json({ error: 'Missing credentials' });
+    const { idToken } = req.body as { idToken?: string };
+    if (!idToken) return res.status(400).json({ error: 'Missing idToken' });
 
-    const user = await AuthRepository.login(email, pass);
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
 
-    return res.json(user);
+    const payload = ticket.getPayload();
+    if (!payload || !payload.sub || !payload.email) {
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
+
+    const user = await AuthRepository.loginWithGoogle(
+      payload.sub,
+      payload.email,
+      payload.name ?? payload.email.split('@')[0],
+    );
+
+    const token = signToken({ userId: user.id, email: user.email });
+    return res.json({ user, token });
   } catch (err) {
-    return res.status(500).json({ error: 'Login failed' });
+    console.error('[Auth] Google login failed:', err);
+    return res.status(401).json({ error: 'Google authentication failed' });
   }
 });
 
-app.post('/api/auth/signup', async (req, res) => {
+// Demo login (development convenience — no real auth for demo user)
+app.post('/api/auth/demo', async (_req, res) => {
   try {
-    const { email, name, pass } = req.body as { email?: string; name?: string; pass?: string };
-    if (!email || !name || !pass) return res.status(400).json({ error: 'Missing fields' });
+    const user = await AuthRepository.findByEmail('demo@ardine.com');
+    if (!user) return res.status(404).json({ error: 'Demo user not found. Run seed first.' });
 
-    const user = await AuthRepository.signUp(email, name, pass);
-    return res.json(user);
-  } catch (_err) {
-    return res.status(500).json({ error: 'Signup failed' });
+    const token = signToken({ userId: user.id, email: user.email });
+    return res.json({ user, token });
+  } catch (err) {
+    return res.status(500).json({ error: 'Demo login failed' });
   }
 });
 
-// Menu
+// ── Stripe config (publishable key for frontend) ───────────────────────────
+
+app.get('/api/config/stripe', (_req, res) => {
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+  if (!publishableKey) {
+    return res.status(503).json({ error: 'Stripe not configured' });
+  }
+  return res.json({ publishableKey });
+});
+
+// ── Menu (customer-facing: no auth; owner mutations: auth required) ────────
+
 app.get('/api/users/:userId/menu', async (req, res) => {
   try {
     const userId = req.params.userId as UserId;
@@ -120,7 +155,7 @@ app.get('/api/users/:userId/menu', async (req, res) => {
   }
 });
 
-app.post('/api/users/:userId/menu/analyze', aiLimiter, async (req, res) => {
+app.post('/api/users/:userId/menu/analyze', requireAuth, aiLimiter, async (req, res) => {
   try {
     const userId = req.params.userId as UserId;
     const { base64 } = req.body as { base64?: string };
@@ -134,7 +169,20 @@ app.post('/api/users/:userId/menu/analyze', aiLimiter, async (req, res) => {
   }
 });
 
-// Config
+app.delete('/api/users/:userId/menu/:dishId', requireAuth, async (req, res) => {
+  try {
+    const userId = req.params.userId as UserId;
+    const dishId = req.params.dishId;
+    await deleteDish(userId, dishId);
+    return res.json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to delete dish';
+    return res.status(400).json({ error: message });
+  }
+});
+
+// ── Config (owner-only: auth required) ─────────────────────────────────────
+
 app.get('/api/users/:userId/config', async (req, res) => {
   try {
     const userId = req.params.userId as UserId;
@@ -145,7 +193,7 @@ app.get('/api/users/:userId/config', async (req, res) => {
   }
 });
 
-app.put('/api/users/:userId/config', async (req, res) => {
+app.put('/api/users/:userId/config', requireAuth, async (req, res) => {
   try {
     const userId = req.params.userId as UserId;
     const incoming = req.body as RestaurantConfig;
@@ -160,8 +208,10 @@ app.put('/api/users/:userId/config', async (req, res) => {
   }
 });
 
-// Orders
-app.get('/api/users/:userId/orders', async (req, res) => {
+// ── Orders ─────────────────────────────────────────────────────────────────
+
+// Customer-facing: list orders for a restaurant (for owner dashboard, auth required)
+app.get('/api/users/:userId/orders', requireAuth, async (req, res) => {
   try {
     const userId = req.params.userId as UserId;
     const orders = await getLiveOrders(userId);
@@ -171,20 +221,23 @@ app.get('/api/users/:userId/orders', async (req, res) => {
   }
 });
 
+// Customer places a Cash order (no Stripe, no auth)
 app.post('/api/users/:userId/orders', async (req, res) => {
   try {
     const userId = req.params.userId as UserId;
-    const { tableNumber, items, paymentMethod } = req.body as {
+    const { tableNumber, items, paymentMethod, customerName, customerPhone } = req.body as {
       tableNumber?: number;
       items?: OrderItem[];
       paymentMethod?: PaymentMethod;
+      customerName?: string;
+      customerPhone?: string;
     };
 
-    if (!tableNumber || !items || !paymentMethod) {
+    if (!tableNumber || !items || !paymentMethod || !customerName || !customerPhone) {
       return res.status(400).json({ error: 'Invalid order payload' });
     }
 
-    const order = await createNewOrder(userId, tableNumber, items, paymentMethod);
+    const order = await createNewOrder(userId, tableNumber, items, paymentMethod, customerName, customerPhone);
     return res.json(order);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to place order';
@@ -192,17 +245,58 @@ app.post('/api/users/:userId/orders', async (req, res) => {
   }
 });
 
-app.patch('/api/users/:userId/orders/:orderId/status', async (req, res) => {
+// Customer creates a Stripe PaymentIntent (no auth — customer-facing)
+app.post('/api/users/:userId/orders/create-payment-intent', async (req, res) => {
+  try {
+    const userId = req.params.userId as UserId;
+    const { tableNumber, items, paymentMethod, customerName, customerPhone } = req.body as {
+      tableNumber?: number;
+      items?: OrderItem[];
+      paymentMethod?: PaymentMethod;
+      customerName?: string;
+      customerPhone?: string;
+    };
+
+    if (!tableNumber || !items || !paymentMethod || !customerName || !customerPhone) {
+      return res.status(400).json({ error: 'Invalid order payload' });
+    }
+
+    const result = await createOrderPaymentIntent(userId, tableNumber, items, paymentMethod, customerName, customerPhone);
+    return res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create payment intent';
+    return res.status(400).json({ error: message });
+  }
+});
+
+// Customer confirms payment after Stripe checkout (no auth — customer-facing)
+app.post('/api/users/:userId/orders/:orderId/confirm-payment', async (req, res) => {
+  try {
+    const orderId = req.params.orderId;
+    const { paymentIntentId } = req.body as { paymentIntentId?: string };
+    if (!paymentIntentId) return res.status(400).json({ error: 'Missing paymentIntentId' });
+
+    await confirmOrderPayment(orderId, paymentIntentId);
+    return res.json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Payment verification failed';
+    return res.status(400).json({ error: message });
+  }
+});
+
+// Owner updates order status (auth required)
+app.patch('/api/users/:userId/orders/:orderId/status', requireAuth, async (req, res) => {
   try {
     const userId = req.params.userId as UserId;
     const orderId = req.params.orderId;
-    const { status } = req.body as { status?: Order['status'] };
+    const { status } = req.body as { status?: OrderStatus };
     if (!status) return res.status(400).json({ error: 'Missing status' });
 
     await updateStatus(userId, orderId, status);
     return res.json({ ok: true });
-  } catch (_err) {
-    return res.status(400).json({ error: 'Failed to update status' });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to update status';
+    return res.status(400).json({ error: message });
   }
 });
 

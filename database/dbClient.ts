@@ -51,7 +51,7 @@ class PostgresClient {
     const { rows } = await this.pool.query(
       `SELECT id, user_id, name, description, price, category, images,
               portion_size, is_ar_ready, ar_model_url,
-              model_generation_status, generation_progress
+              model_generation_status, generation_progress, geometric_prompt
        FROM dishes WHERE user_id = $1
        ORDER BY created_at DESC`,
       [userId]
@@ -63,17 +63,27 @@ class PostgresClient {
     const { rows } = await this.pool.query(
       `INSERT INTO dishes (id, user_id, name, description, price, category, images,
                            portion_size, is_ar_ready, ar_model_url,
-                           model_generation_status, generation_progress)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                           model_generation_status, generation_progress, geometric_prompt)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         dish.id, dish.userId, dish.name, dish.description,
         dish.price, dish.category, dish.images,
         dish.portionSize, dish.isARReady, dish.arModelUrl ?? null,
         dish.modelGenerationStatus, dish.generationProgress,
+        dish.geometricPrompt ?? null,
       ]
     );
     return this.rowToDish(rows[0]);
+  }
+
+  async deleteDish(userId: UserId, dishId: string): Promise<{ images: string[]; arModelUrl?: string }> {
+    const { rows } = await this.pool.query(
+      `DELETE FROM dishes WHERE id = $1 AND user_id = $2 RETURNING images, ar_model_url`,
+      [dishId, userId]
+    );
+    if (rows.length === 0) throw new Error('Dish not found');
+    return { images: rows[0].images ?? [], arModelUrl: rows[0].ar_model_url ?? undefined };
   }
 
   async updateDishStatus(userId: UserId, dishId: string, updates: Partial<Dish>): Promise<void> {
@@ -134,12 +144,56 @@ class PostgresClient {
     return rows.length > 0 ? { id: rows[0].id, email: rows[0].email, name: rows[0].name } : null;
   }
 
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    const { rows } = await this.pool.query(
+      `SELECT id, email, name, google_id FROM users WHERE google_id = $1`,
+      [googleId]
+    );
+    if (rows.length === 0) return null;
+    return { id: rows[0].id, email: rows[0].email, name: rows[0].name, googleId: rows[0].google_id };
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    const { rows } = await this.pool.query(
+      `SELECT id, email, name, google_id FROM users WHERE email = $1`,
+      [email]
+    );
+    if (rows.length === 0) return null;
+    return { id: rows[0].id, email: rows[0].email, name: rows[0].name, googleId: rows[0].google_id ?? undefined };
+  }
+
+  async findOrCreateByGoogle(googleId: string, email: string, name: string): Promise<User> {
+    // First try by google_id
+    const existing = await this.findByGoogleId(googleId);
+    if (existing) return existing;
+
+    // Then try by email (link existing account to google)
+    const byEmail = await this.findByEmail(email);
+    if (byEmail) {
+      await this.pool.query(
+        `UPDATE users SET google_id = $1 WHERE id = $2`,
+        [googleId, byEmail.id]
+      );
+      return { ...byEmail, googleId };
+    }
+
+    // Create new user
+    const id = `u_${Date.now()}`;
+    const { rows } = await this.pool.query(
+      `INSERT INTO users (id, email, name, google_id) VALUES ($1, $2, $3, $4)
+       RETURNING id, email, name, google_id`,
+      [id, email, name, googleId]
+    );
+    return { id: rows[0].id, email: rows[0].email, name: rows[0].name, googleId: rows[0].google_id };
+  }
+
   // ── Orders ─────────────────────────────────────────────────────────────
 
   async queryOrders(userId: UserId): Promise<Order[]> {
     const { rows: orderRows } = await this.pool.query(
       `SELECT id, user_id, table_number, status, total,
-              payment_method, payment_status, created_at
+              payment_method, payment_status, customer_name, customer_phone,
+              stripe_payment_intent_id, created_at
        FROM orders WHERE user_id = $1
        ORDER BY created_at DESC`,
       [userId]
@@ -164,6 +218,9 @@ class PostgresClient {
         timestamp: new Date(row.created_at).getTime(),
         paymentMethod: row.payment_method,
         paymentStatus: row.payment_status,
+        customerName: row.customer_name,
+        customerPhone: row.customer_phone,
+        stripePaymentIntentId: row.stripe_payment_intent_id ?? undefined,
         items: itemRows.map((ir) => ({
           dish: this.rowToDish(ir),
           quantity: ir.quantity,
@@ -179,9 +236,9 @@ class PostgresClient {
       await client.query('BEGIN');
 
       await client.query(
-        `INSERT INTO orders (id, user_id, table_number, status, total, payment_method, payment_status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [order.id, order.userId, order.tableNumber, order.status, order.total, order.paymentMethod, order.paymentStatus]
+        `INSERT INTO orders (id, user_id, table_number, status, total, payment_method, payment_status, customer_name, customer_phone, stripe_payment_intent_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [order.id, order.userId, order.tableNumber, order.status, order.total, order.paymentMethod, order.paymentStatus, order.customerName, order.customerPhone, order.stripePaymentIntentId ?? null]
       );
 
       for (const item of order.items) {
@@ -206,6 +263,28 @@ class PostgresClient {
     await this.pool.query(
       `UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3`,
       [status, orderId, userId]
+    );
+  }
+
+  async getOrderStatus(orderId: string): Promise<Order['status'] | null> {
+    const { rows } = await this.pool.query(
+      `SELECT status FROM orders WHERE id = $1`,
+      [orderId]
+    );
+    return rows.length > 0 ? rows[0].status : null;
+  }
+
+  async updateOrderPayment(orderId: string, paymentStatus: Order['paymentStatus'], stripePaymentIntentId?: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE orders SET payment_status = $1, stripe_payment_intent_id = COALESCE($2, stripe_payment_intent_id) WHERE id = $3`,
+      [paymentStatus, stripePaymentIntentId ?? null, orderId]
+    );
+  }
+
+  async updateOrderPaymentByIntentId(stripePaymentIntentId: string, paymentStatus: Order['paymentStatus']): Promise<void> {
+    await this.pool.query(
+      `UPDATE orders SET payment_status = $1 WHERE stripe_payment_intent_id = $2`,
+      [paymentStatus, stripePaymentIntentId]
     );
   }
 
@@ -246,6 +325,7 @@ class PostgresClient {
       arModelUrl: row.ar_model_url as string | undefined,
       modelGenerationStatus: (row.model_generation_status as Dish['modelGenerationStatus']) ?? 'pending',
       generationProgress: (row.generation_progress as number) ?? 0,
+      geometricPrompt: (row.geometric_prompt as string) ?? undefined,
     };
   }
 }

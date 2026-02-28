@@ -15,9 +15,14 @@
 - Keep shared types in `src/shared/types.ts`.
 - Status enums:
   - `ModelGenerationStatus`: `pending | generating | ready | failed`.
-  - `Order.status`: `received | preparing | served | paid`.
+  - `OrderStatus`: `received | preparing | ready | served | cancelled`.
+  - `PaymentStatus`: `Pending | Paid | Failed`.
+  - `PaymentMethod`: `UPI | Card | Cash`.
 - The `dishes` table includes `geometric_prompt TEXT` for the AI-generated 3D instructions.
 - The `images TEXT[]` column stores **URLs** (to MinIO/S3), never base64.
+- The `orders` table includes `customer_name TEXT NOT NULL`, `customer_phone TEXT NOT NULL`, `stripe_payment_intent_id TEXT`.
+- The `users` table includes `google_id TEXT UNIQUE` for OAuth; `password_hash` is nullable (not used).
+- Order status transitions follow a state machine defined in `ORDER_STATUS_TRANSITIONS` (types.ts).
 
 ## Schema & Migrations
 - Schema: `backend/db/schema.sql` — auto-applied by Postgres on first Docker boot via `docker-entrypoint-initdb.d/`.

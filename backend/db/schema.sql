@@ -3,10 +3,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY, -- keeping text to match existing 'u_...' format for now, or could use UUID
+    id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
-    password_hash TEXT NOT NULL, -- Storing plain text for now based on existing code, should be hashed
+    password_hash TEXT,          -- nullable: OAuth-only users won't have one
+    google_id TEXT UNIQUE,       -- Google OAuth subject ID
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -42,10 +43,13 @@ CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     user_id TEXT REFERENCES users(id),
     table_number INTEGER NOT NULL,
-    status TEXT NOT NULL, -- 'pending', 'preparing', 'ready', 'served', 'paid'
+    status TEXT NOT NULL,  -- 'received', 'preparing', 'served', 'paid'
     total DECIMAL(10, 2) NOT NULL,
     payment_method TEXT,
-    payment_status TEXT,
+    payment_status TEXT,   -- 'Pending', 'Paid', 'Failed'
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    stripe_payment_intent_id TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

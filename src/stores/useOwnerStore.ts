@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Dish, Order, RestaurantConfig, UserId } from '@/shared/types';
+import { Dish, Order, OrderStatus, RestaurantConfig, UserId } from '@/shared/types';
 import { ApiService } from '@/shared/services/api';
 
 interface OwnerState {
@@ -12,10 +12,11 @@ interface OwnerState {
     // Menu actions
     loadMenu: (userId: UserId) => Promise<void>;
     addDish: (dish: Dish) => void;
+    removeDish: (userId: UserId, dishId: string) => Promise<void>;
 
     // Order actions
     loadOrders: (userId: UserId) => Promise<void>;
-    updateOrderStatus: (userId: UserId, orderId: string, status: Order['status']) => Promise<void>;
+    updateOrderStatus: (userId: UserId, orderId: string, status: OrderStatus) => Promise<void>;
 
     // Config actions
     loadConfig: (userId: UserId) => Promise<void>;
@@ -50,6 +51,19 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
         }));
     },
 
+    removeDish: async (userId: UserId, dishId: string) => {
+        try {
+            await ApiService.deleteDish(userId, dishId);
+            set((state) => ({
+                menu: state.menu.filter(d => d.id !== dishId),
+            }));
+        } catch (error) {
+            set({
+                error: error instanceof Error ? error.message : 'Failed to delete dish'
+            });
+        }
+    },
+
     loadOrders: async (userId: UserId) => {
         set({ isLoading: true, error: null });
         try {
@@ -63,7 +77,7 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
         }
     },
 
-    updateOrderStatus: async (userId: UserId, orderId: string, status: Order['status']) => {
+    updateOrderStatus: async (userId: UserId, orderId: string, status: OrderStatus) => {
         try {
             await ApiService.updateOrderStatus(userId, orderId, status);
             // Reload orders after update

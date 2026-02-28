@@ -76,9 +76,9 @@ ingress:
 postgresql:
   enabled: true  # Set false to use managed DB (RDS, Cloud SQL, Azure DB)
   auth:
-    postgresPassword: ardine_secret
+    postgresPassword: ""  # REQUIRED: set via --set or external secret manager
     username: ardine
-    password: ardine_secret
+    password: ""  # REQUIRED: set via --set or external secret manager
     database: ardine
 
 # When postgresql.enabled=false, set this:
@@ -104,8 +104,8 @@ externalRedis:
 
 minio:
   enabled: true  # Set false to use managed S3, GCS, or Azure Blob
-  rootUser: minioadmin
-  rootPassword: minioadmin
+  rootUser: ""  # REQUIRED: set via --set or external secret manager
+  rootPassword: ""  # REQUIRED: set via --set or external secret manager
   buckets:
     - name: dish-images
       policy: download
@@ -140,6 +140,11 @@ otelCollector:
 
 secrets:
   geminiApiKey: ""  # Set via --set secrets.geminiApiKey=xxx or external secret manager
+  googleClientId: ""  # Google OAuth Client ID
+  jwtSecret: ""  # JWT signing secret
+  stripeSecretKey: ""  # Stripe secret key
+  stripePublishableKey: ""  # Stripe publishable key (also used as frontend build arg)
+  stripeWebhookSecret: ""  # Stripe webhook endpoint secret
 
 env:
   STORAGE_PUBLIC_URL: "https://ardine.local/storage"

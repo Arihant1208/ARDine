@@ -10,6 +10,7 @@ export interface User {
   email: string;
   name: string;
   avatar?: string;
+  googleId?: string;
 }
 
 export interface Dish {
@@ -25,6 +26,7 @@ export interface Dish {
   arModelUrl?: string;
   modelGenerationStatus: ModelGenerationStatus;
   generationProgress: number; // 0 to 100
+  geometricPrompt?: string;
 }
 
 export interface OrderItem {
@@ -32,9 +34,18 @@ export interface OrderItem {
   quantity: number;
 }
 
-export type PaymentMethod = 'UPI' | 'Card' | 'Cash' | 'Wallet';
-export type PaymentStatus = 'Pending' | 'Paid';
-export type OrderStatus = 'received' | 'preparing' | 'served' | 'paid';
+export type PaymentMethod = 'UPI' | 'Card' | 'Cash';
+export type PaymentStatus = 'Pending' | 'Paid' | 'Failed';
+export type OrderStatus = 'received' | 'preparing' | 'ready' | 'served' | 'cancelled';
+
+/** Allowed order status transitions (state-machine). */
+export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  received: ['preparing', 'cancelled'],
+  preparing: ['ready', 'cancelled'],
+  ready: ['served', 'cancelled'],
+  served: [],
+  cancelled: [],
+};
 
 export interface Order {
   id: OrderId;
@@ -46,6 +57,9 @@ export interface Order {
   timestamp: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  customerName: string;
+  customerPhone: string;
+  stripePaymentIntentId?: string;
 }
 
 export interface RestaurantConfig {
@@ -54,16 +68,13 @@ export interface RestaurantConfig {
   tables: number;
 }
 
-export type ViewState = 
-  | 'landing' 
-  | 'auth'
-  | 'owner-setup' 
-  | 'owner-dashboard' 
-  | 'customer-menu' 
-  | 'customer-cart';
-
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+export interface AuthTokenPayload {
+  userId: UserId;
+  email: string;
 }

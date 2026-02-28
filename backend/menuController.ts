@@ -4,7 +4,7 @@ import { getAIClient } from "./aiClient";
 import { Dish, UserId } from "../src/shared/types";
 import { validateMenuImage } from "./validators";
 import { MenuRepository } from "../database/repositories";
-import { uploadFile, BUCKET_IMAGES } from "./storageClient";
+import { uploadFile, BUCKET_IMAGES, deleteFile, BUCKET_MODELS } from "./storageClient";
 import { scanBuffer } from "./scannerClient";
 import { enqueueModelGeneration } from "./queue";
 
@@ -96,4 +96,30 @@ export const processMenuUpload = async (userId: UserId, base64Image: string): Pr
 
 export const fetchMenu = async (userId: UserId): Promise<Dish[]> => {
   return await MenuRepository.getAll(userId);
+};
+
+/** Delete a dish and its associated files from storage. */
+export const deleteDish = async (userId: UserId, dishId: string): Promise<void> => {
+  const { images, arModelUrl } = await MenuRepository.delete(userId, dishId);
+
+  // Best-effort cleanup of blob storage files
+  for (const imageUrl of images) {
+    try {
+      // Extract object key from the URL: e.g., ".../dish-images/userId/file.jpg" → "userId/file.jpg"
+      const key = imageUrl.split(`/${BUCKET_IMAGES}/`)[1];
+      if (key) await deleteFile(BUCKET_IMAGES, key);
+    } catch {
+      // Non-critical: log but don't fail
+      console.warn(`[Menu] Failed to delete image blob: ${imageUrl}`);
+    }
+  }
+
+  if (arModelUrl) {
+    try {
+      const key = arModelUrl.split(`/${BUCKET_MODELS}/`)[1];
+      if (key) await deleteFile(BUCKET_MODELS, key);
+    } catch {
+      console.warn(`[Menu] Failed to delete model blob: ${arModelUrl}`);
+    }
+  }
 };
